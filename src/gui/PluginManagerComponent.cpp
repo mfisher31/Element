@@ -680,25 +680,38 @@ private:
 			propertiesToUse->saveIfNeeded();
 		}
 
-		progressWindow.addButton(TRANS("Cancel"), 0, KeyPress(KeyPress::escapeKey));
-		progressWindow.addProgressBarComponent(progress);
-		progress = -1.0;
+		
 
 		scanner->addListener(this);
 		finished = false;
-		if (! scanner->isScanning())
+
+        bool running = scanner->isScanning();
+        bool attemptedToStart = false;
+		if (! running)
         {
+            attemptedToStart = true;
             if (formatsToScan.size() > 0)
-                scanner->scanForAudioPlugins (formatsToScan);
+                running = scanner->scanForAudioPlugins (formatsToScan);
             else
-                scanner->scanForAudioPlugins (formatToScan.getName());
+                running = scanner->scanForAudioPlugins (formatToScan.getName());
         }
         
-		startTimer (20);
+		if (running) {
+            progressWindow.addButton(TRANS("Cancel"), 0, KeyPress(KeyPress::escapeKey));
+            progressWindow.addProgressBarComponent (progress);
+            progress = -1.0;
+        }
+        else
+        {
+            progressWindow.setMessage ("Could not start plugin scanner");
+            progressWindow.addButton(TRANS("Ok"), 0, KeyPress(KeyPress::returnKey));
+        }
+        
 		const int result = progressWindow.runModalLoop();
 		if (result == 0)
 		{
-			scanner->cancel();
+            if (scanner->isScanning())
+    			scanner->cancel();
 		}
 		else if (result == 1)
 		{

@@ -30,7 +30,7 @@ class Node;
 class PluginScannerMaster;
 class PluginScanner;
 
-class PluginManager : public ChangeBroadcaster
+class JUCE_API PluginManager : public ChangeBroadcaster
 {
 public:
     PluginManager();
@@ -157,10 +157,10 @@ public:
     static const File& getSlavePluginListFile();
     
     /** scan for plugins of type */
-    void scanForAudioPlugins (const String& formatName);
+    bool scanForAudioPlugins (const String& formatName);
     
     /** Scan for plugins of multiple types */
-    void scanForAudioPlugins (const StringArray& formats);
+    bool scanForAudioPlugins (const StringArray& formats);
     
     /** Cancels the current scan operation */
     void cancel();

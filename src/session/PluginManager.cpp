@@ -25,6 +25,7 @@
 #include "DataPath.h"
 #include "Settings.h"
 #include "Utils.h"
+#include <variant>
 
 #define EL_DEAD_AUDIO_PLUGINS_FILENAME          "DeadAudioPlugins.txt"
 #define EL_PLUGIN_SCANNER_SLAVE_LIST_PATH       "Temp/SlavePluginList.xml"
@@ -54,7 +55,6 @@ public:
     {
         if (isRunning())
             return true;
-        
         {
             ScopedLock sl (lock);
             slaveState  = "waiting";
@@ -204,6 +204,7 @@ private:
 
     void updateListAndLaunchSlave()
     {
+        std::variant<std::shared_ptr<String>, int> var;
         if (auto xml = XmlDocument::parse (PluginScanner::getSlavePluginListFile()))
             owner.list.recreateFromXml (*xml);
         
@@ -221,9 +222,16 @@ private:
     
     bool launchScanner (const int timeout = EL_PLUGIN_SCANNER_DEFAULT_TIMEOUT, const int flags = 0)
     {
+        auto exefile = File::getSpecialLocation (File::currentExecutableFile);
+        if (exefile.hasFileExtension ("dll") ||
+            exefile.hasFileExtension ("so") ||
+            exefile.getFullPathName().containsIgnoreCase (".so."))
+        {
+                return false;
+        }
+        
         resetScannerVariables();
-        return launchSlaveProcess (File::getSpecialLocation (File::invokedExecutableFile),
-                                   EL_PLUGIN_SCANNER_PROCESS_ID, timeout, flags);
+        return launchSlaveProcess (exefile, EL_PLUGIN_SCANNER_PROCESS_ID, timeout, flags);
     }
 };
 
@@ -431,20 +439,22 @@ void PluginScanner::cancel()
 
 bool PluginScanner::isScanning() const { return master && master->isRunning(); }
 
-void PluginScanner::scanForAudioPlugins (const juce::String &formatName)
+bool PluginScanner::scanForAudioPlugins (const juce::String &formatName)
 {
-    scanForAudioPlugins (StringArray ({ formatName }));
+    return scanForAudioPlugins (StringArray ({ formatName }));
 }
 
-void PluginScanner::scanForAudioPlugins (const StringArray& formats)
+bool PluginScanner::scanForAudioPlugins (const StringArray& formats)
 {
     cancel();
     getSlavePluginListFile().deleteFile();
 	if (master == nullptr)
 		master.reset (new PluginScannerMaster (*this));
 	if (master->isRunning())
-		return;
-    master->startScanning (formats);
+		return true;
+    
+    bool started = master->startScanning (formats);
+    return started;
 }
 
 void PluginScanner::timerCallback()
@@ -682,10 +692,10 @@ void PluginManager::addDefaultFormats()
             audioPlugs.addFormat (new LADSPAPluginFormat());
        #endif
        
-       #if JLV2_PLUGINHOST_LV2
-        else if (fmt == "LV2")
-            audioPlugs.addFormat (new jlv2::LV2PluginFormat());
-       #endif
+    //    #if JLV2_PLUGINHOST_LV2
+    //     else if (fmt == "LV2")
+    //         audioPlugs.addFormat (new jlv2::LV2PluginFormat());
+    //    #endif
     }
 }
 
