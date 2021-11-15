@@ -107,13 +107,16 @@
                 "/usr/include/suil-0/*",
                 "/usr/include/serd-0/*",
                 "/usr/include/sord-0/*",
-                "/usr/include/sratom-0/*",             
+                "/usr/include/sratom-0/*",
+                "${workspaceRoot}/build/include",
                 "${workspaceRoot}/libs/JUCE/modules/*",
                 "${workspaceRoot}/libs/kv/modules/*",
+                "${workspaceRoot}/libs/kv/include/*",
                 "${workspaceRoot}/libs/jlv2/modules/*",
                 "${workspaceRoot}/libs/compat/*",
                 "${workspaceRoot}/libs/lua/*",
                 "${workspaceRoot}/libs/lua/src/*",
+                "${workspaceRoot}/libs/element/include/*",
                 "${workspaceRoot}/src/*",
                 "${workspaceRoot}/test/*",
                 "${workspaceRoot}/libs/lua-kv/*",
@@ -129,6 +132,50 @@
                 "${workspaceRoot}/.vscode/vscode.h"
             ],
             "intelliSenseMode": "linux-clang-x64",
+            "compilerPath": "/usr/bin/clang",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            },
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        },
+        {
+            "name": "Linux Mingw32",
+            "includePath": [
+                // "/usr/local/include/*",
+                // "/usr/include/*",
+                // "/usr/include/lilv-0/*",
+                // "/usr/include/suil-0/*",
+                // "/usr/include/serd-0/*",
+                // "/usr/include/sord-0/*",
+                // "/usr/include/sratom-0/*",
+                "${workspaceRoot}/build/include",
+                "${workspaceRoot}/libs/JUCE/modules/*",
+                "${workspaceRoot}/libs/kv/modules/*",
+                "${workspaceRoot}/libs/kv/include/*",
+                "${workspaceRoot}/libs/jlv2/modules/*",
+                "${workspaceRoot}/libs/compat/*",
+                "${workspaceRoot}/libs/lua/*",
+                "${workspaceRoot}/libs/lua/src/*",
+                "${workspaceRoot}/libs/element/include/*",
+                "${workspaceRoot}/src/*",
+                "${workspaceRoot}/test/*",
+                "${workspaceRoot}/libs/lua-kv/*",
+                "${workspaceRoot}/libs/lua-kv/src/*"
+            ],
+            "defines": [
+                "_WIN32=1",
+                "LUA_USE_READLINE=1",
+                "EL_LUADIR=\"/usr/share/element/lua\"",
+                "EL_SCRIPTSDIR=\"/usr/share/element/scripts\"",
+                "JUCE_PLUGINHOST_AU=0"
+            ],
+            "forcedInclude": [
+                "${workspaceRoot}/.vscode/vscode.h"
+            ],
+            "intelliSenseMode": "windows-gcc-x64",
+            "compilerPath": "/usr/bin/x86_64-w64-mingw32-g++",
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
