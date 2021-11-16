@@ -1,0 +1,12 @@
+#!/bin/env python
+import plugins
+
+jack = bld (
+    features        = 'c cshlib',
+    includes        = [ '../../libs/element/include' ],
+    source          = [ 'jack.c' ],
+    name            = 'jack',
+    target          = 'jack',
+    cflags          = [ '-fvisibility=hidden' ],
+    env             = plugins.derive_env (bld)
+)

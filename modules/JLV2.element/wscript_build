@@ -1,0 +1,14 @@
+#!/bin/env python
+import plugins
+
+bld (
+    features        = 'cxx cxxshlib',
+    includes        = [ '../../libs/jlv2/modules' ],
+    source          = [ 'jlv2plugin.cpp' ],
+    name            = 'JLV2_element',
+    target          = 'JLV2',
+    use             = [ 'ELEMENT_JUCE', 'LILV', 'SUIL', 'LV2' ],
+    cxxflags        = [ '-fvisibility=hidden' ],
+    env             = plugins.derive_env (bld),
+    defines         = [ 'JUCE_DLL_BUILD=1' ]
+)
