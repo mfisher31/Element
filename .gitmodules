@@ -10,7 +10,3 @@
 	path = libs/jlv2
 	url = https://github.com/lvtk/jlv2
 	branch = master
-[submodule "libs/lua-kv"]
-	path = libs/lua-kv
-	url = https://github.com/kushview/lua-kv
-	branch = master
