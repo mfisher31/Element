@@ -74,7 +74,9 @@ def configure (conf):
                      os.path.join (conf.env.PREFIX, 'bin'))
     set_install_dir (conf, 'LIBDIR', conf.options.libdir, 
                      os.path.join (conf.env.PREFIX, 'lib'))
-
+    set_install_dir (conf, 'INCLUDEDIR', None,
+                     os.path.join (conf.env.PREFIX, 'include/element'))
+                    
     conf.env.DATADIR    = os.path.join (conf.env.PREFIX,  'share/element')
     conf.env.DOCDIR     = os.path.join (conf.env.PREFIX,  'share/doc/element')
     conf.env.VSTDIR     = os.path.join (conf.env.LIBDIR,  'vst')
@@ -104,10 +106,16 @@ def configure (conf):
     if len(conf.env.GIT_HASH) > 0:
         conf.define ('EL_GIT_VERSION', conf.env.GIT_HASH)
 
-    # Hidden Visibiility by default
-    for k in 'CFLAGS CXXFLAGS'.split():
-        conf.env.append_unique (k, ['-fvisibility=hidden'])
-
+    conf.define ('JUCE_DLL', True)
+    conf.define ('JUCE_STANDALONE_APPLICATION', False)
+    conf.define ('JUCE_DISPLAY_SPLASH_SCREEN', False)
+    conf.define ('JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED', True)
+    for m in element.juce_modules.split():
+        conf.define ('JUCE_MODULE_AVAILABLE_%s' % m, True)
+    
+    conf.write_config_header (configfile='include/element/config.h',
+                              guard='EL_CONFIG_H')
+    
     print
     juce.display_header ("Element")
     conf.message ("Config", 'Debug' if conf.options.debug else 'Release')
@@ -166,11 +174,34 @@ def lua_kv_sources (ctx):
            ctx.path.ant_glob ('libs/lua-kv/src/kv/**/*.cpp')
 
 def juce_sources (ctx):
-    return element.get_juce_library_code ("libs/compat") + \
-           ctx.path.ant_glob ('libs/compat/BinaryData*.cpp')
+    return element.get_juce_library_code ("libs/compat")
 
 def element_sources (ctx):
-    return ctx.path.ant_glob ('src/**/*.cpp')
+    lua_mod_sources = '''
+        libs/element/lua/el/audio.c
+        libs/element/lua/el/bytes.c
+        libs/element/lua/el/midi.c
+        libs/element/lua/el/round.c
+        libs/element/lua/el/vector.c
+    '''.split()
+    lib_sources = '''
+        libs/element/src/context.cpp
+        libs/element/src/scripting.cpp
+        '''.split()
+    if ctx.host_is_windows():
+        lib_sources.append ('libs/element/src/dlfcn-win32.c')
+    
+    sources = lua_mod_sources + lib_sources
+    return sources
+
+def element_juce_sources (ctx):
+    sources  = element.kv_module_code (ctx, "libs/compat")
+    return sources
+
+def element_juce_app_sources (ctx):
+    sources = ctx.path.ant_glob ('src/**/*.cpp')
+    sources += ctx.path.ant_glob ('libs/compat/BinaryData*.cpp')
+    return sources
 
 def build_desktop (bld, slug='element'):
     if not juce.is_linux():
@@ -213,70 +244,27 @@ def build_lua_docs (bld):
         call ([bld.env.LDOC[0], '-f', 'markdown', '.' ])
 
 def build_liblua (bld):
-    luaEnv = bld.env.derive()
-    for k in 'CFLAGS CXXFLAGS LINKFLAGS'.split():
-        luaEnv.append_unique (k, [ '-fPIC' ])
-    lua = bld (
-        name     = 'LUA',
-        target   = 'lib/lua',
-        env      = luaEnv,
-        install_path = None,
-        features = 'cxx cxxstlib',
-        includes = [
-            'libs/lua',
-            'libs/lua/src'
-        ],
-        source = '''
-            libs/lua/src/lauxlib.c
-            libs/lua/src/liolib.c
-            libs/lua/src/lopcodes.c
-            libs/lua/src/lstate.c
-            libs/lua/src/lobject.c
-            libs/lua/src/lmathlib.c
-            libs/lua/src/loadlib.c
-            libs/lua/src/lvm.c
-            libs/lua/src/lfunc.c
-            libs/lua/src/lstrlib.c
-            libs/lua/src/linit.c
-            libs/lua/src/lstring.c
-            libs/lua/src/lundump.c
-            libs/lua/src/lctype.c
-            libs/lua/src/ltable.c
-            libs/lua/src/ldump.c
-            libs/lua/src/loslib.c
-            libs/lua/src/lgc.c
-            libs/lua/src/lzio.c
-            libs/lua/src/ldblib.c
-            libs/lua/src/lutf8lib.c
-            libs/lua/src/lmem.c
-            libs/lua/src/lcorolib.c
-            libs/lua/src/lcode.c
-            libs/lua/src/ltablib.c
-            libs/lua/src/lapi.c
-            libs/lua/src/lbaselib.c
-            libs/lua/src/ldebug.c
-            libs/lua/src/lparser.c
-            libs/lua/src/llex.c
-            libs/lua/src/ltm.c
-            libs/lua/src/ldo.c
-        '''.split()
-    )
-    lua.export_includes = lua.includes
-    bld.add_group()
+    pass
+    # luaEnv = bld.env.derive()
+    # for k in 'CFLAGS CXXFLAGS LINKFLAGS'.split():
+    #     luaEnv.append_unique (k, [ '-fPIC' ])
 
-    lua_kv = bld (
-        name     = 'LUA_KV',
-        target   = 'lib/lua-kv',
-        env      = luaEnv,
-        install_path = None,
-        features = 'cxx cxxstlib',
-        includes = common_includes() + [ 'libs/lua-kv/include', \
-                                         'libs/lua-kv/src' ],
-        source = lua_kv_sources (bld),
-        use = [ 'LUA' ]
-    )
-    lua_kv.export_includes = lua_kv.includes
-    bld.add_group()
+    # lua_kv = bld (
+    #     name     = 'LUA_KV',
+    #     target   = 'lib/lua-kv',
+    #     env      = luaEnv,
+    #     install_path = None,
+    #     features = 'cxx cxxshlib',
+    #     includes = common_includes() + [ 'libs/element/include', \
+    #                                      'libs/lua-kv/include', \
+    #                                      'libs/lua-kv/src' ],
+    #     source = lua_kv_sources (bld),
+    #     use = [ 'LUA' ],
+    #     defines = [ 'JUCE_DLL_BUILD=1' ]
+    # )
+
+    # lua_kv.export_includes = lua_kv.includes
+    # bld.add_group()
 
 def add_scripts_to (bld, builddir, instdir, 
                     modsdir='Modules', 
@@ -383,13 +371,17 @@ def build_libjuce (bld):
         target      = 'lib/juce',
         name        = 'LIBJUCE',
         env         = libEnv,
-        use         = [ 'DEPENDS', 'LILV', 'SUIL', 'ASIO' ],
-        cxxflags    = [],
+        use         = [ 'DEPENDS', 'ASIO' ],
+        defines     = [],
+        cxxflags    = [ '-fvisibility=hidden' ],
         linkflags   = [],
         install_path = None
     )
+
     if bld.host_is_linux():
         libjuce.use += ['FREETYPE2', 'X11', 'DL', 'PTHREAD', 'ALSA', 'XEXT', 'CURL']
+    elif bld.host_is_windows():
+        libjuce.defines.append ('JUCE_DLL_BUILD=1')
     bld.add_group()
 
 def build_libelement (bld):
@@ -398,30 +390,92 @@ def build_libelement (bld):
         env.append_unique (k, [ '-fPIC' ])
     
     library = bld (
-        features    = 'cxx cxxstlib',
+        features    = 'cxx cxxshlib',
         source      = element_sources (bld),
-        includes    = common_includes(),
+        includes    = [
+            'libs/element/include'
+        ],
         target      = 'lib/element',
         name        = 'ELEMENT',
         env         = env,
-        use         = [ 'BOOST_SIGNALS', 'LUA', 'LUA_KV', 'DEPENDS' ],
-        cxxflags    = [],
-        linkflags   = [],
-        install_path = None
+        use         = [ 'DEPENDS', 'LUA' ],
+        cflags      = [ '-fvisibility=hidden' ],
+        cxxflags    = [ '-fvisibility=hidden' ],
+        defines     = [ 'EL_PRO=1', 'EL_DLLEXPORT=1' ],
+        linkflags   = [ '-Wl,--no-as-needed' ],
+        vnum        = '0.47.0',
+        install_path = bld.env.LIBDIR
+    )
+    
+    bld (
+        features      = 'subst',
+        source        = 'element.pc.in',
+        target        = 'element.pc',
+        NAME          = 'element',
+        LIBNAME       = os.path.basename (library.target),
+        PREFIX        = bld.env.PREFIX,
+        VERSION       = library.vnum,
+        INCLUDEDIR    = os.path.join (bld.env.PREFIX, 'include'),
+        install_path  = os.path.join (library.install_path, 'pkgconfig')
     )
 
-    if bld.env.LUA:     library.use += [ 'LUA' ]
-    if bld.env.LV2:     library.use += [ 'SUIL', 'LILV', 'LV2' ]
+    if bld.host_is_linux() and not bld.env.LUA:
+        library.use.append ('DL')
+    
+    library.export_includes = library.includes
+    bld.add_group()
+
+def build_libelement_juce (bld):
+    env = bld.env.derive()
+    for k in 'CFLAGS CXXFLAGS LINKFLAGS'.split():
+        env.append_unique (k, [ '-fPIC' ])
+    
+    jsources = juce_sources (bld)
+    el_lua_sources = '''
+        libs/element/lua/el/AudioBuffer32.cpp
+        libs/element/lua/el/AudioBuffer64.cpp
+        libs/element/lua/el/MidiMessage.cpp
+        libs/element/lua/el/MidiBuffer.cpp
+        libs/element/lua/el/Graphics.cpp
+        libs/element/lua/el/Point.cpp
+        libs/element/lua/el/Range.cpp
+        libs/element/lua/el/Rectangle.cpp
+        libs/element/lua/el/Bounds.cpp
+        libs/element/lua/el/TextButton.cpp
+        libs/element/lua/el/Widget.cpp
+        libs/element/lua/el/Desktop.cpp
+        libs/element/lua/el/DocumentWindow.cpp
+        libs/element/lua/el/MouseEvent.cpp
+        libs/element/lua/el/File.cpp
+        libs/element/lua/el/Slider.cpp
+    '''.split()
+
+    library = bld (
+        features    = 'cxx cxxshlib',
+        source      = el_lua_sources + jsources,
+        includes    = common_includes(),
+        target      = 'lib/element-juce',
+        name        = 'ELEMENT_JUCE',
+        env         = env,
+        defines     = [],
+        use         = [ 'DEPENDS', 'ELEMENT', 'LUA' ],
+        cflags      = [ '-fvisibility=hidden' ],
+        cxxflags    = [ '-fvisibility=hidden' ],
+        linkflags   = [ '-fvisibility=hidden' ],
+        vnum        = '0.47.0',
+        install_path = bld.env.LIBDIR
+    )
+
     if bld.env.JACK:    library.use += [ 'JACK' ]
 
     if bld.host_is_linux():
         library.use += ['FREETYPE2', 'X11', 'DL', 'PTHREAD', 'ALSA', 'XEXT', 'CURL']
-        library.cxxflags += [
-            '-DLUA_PATH_DEFAULT="%s"'  % env.LUA_PATH_DEFAULT,
-            '-DLUA_CPATH_DEFAULT="%s"' % env.LUA_CPATH_DEFAULT,
-            '-DEL_LUADIR="%s"'         % env.LUADIR,
-            '-DEL_SCRIPTSDIR="%s"'     % env.SCRIPTSDIR
-        ]
+        # library.cxxflags += [
+        #     '-DLUA_PATH_DEFAULT="%s"'  % env.LUA_PATH_DEFAULT,
+        #     '-DLUA_CPATH_DEFAULT="%s"' % env.LUA_CPATH_DEFAULT,
+        #     '-DEL_LUADIR="%s"'         % env.LUADIR,
+        #     '-DEL_SCRIPTSDIR="%s"'     % env.SCRIPTSDIR
+        # ]
 
     elif bld.host_is_mac():
         library.use += [
@@ -435,21 +489,62 @@ def build_libelement (bld):
             library.use.append (l.upper())
         if bld.env.DEBUG:
             library.env.append_unique ('CXXFLAGS', ['-Wa,-mbig-obj'])
+        # library.defines.append ('EL_DLLEXPORT=1')
+        # library.defines.append ('JUCE_DLL_BUILD=1')
+        # library.env.append_unique ('LINKFLAGS_STATIC_GCC', [ '-static-libgcc', '-static-libstdc++',
+        #                                                  '-Wl,-Bstatic,--whole-archive', '-lwinpthread', 
+        #                                                  '-Wl,--no-whole-archive' ])
+        # library.use += [ 'STATIC_GCC' ]
+
+    pcfile = bld (
+        features      = 'subst',
+        source        = 'element.pc.in',
+        target        = 'element-juce.pc',
+        NAME          = 'element-juce',
+        LIBNAME       = os.path.basename (library.target),
+        PREFIX        = bld.env.PREFIX,
+        VERSION       = library.vnum,
+        REQUIRES_PRIVATE    = 'element >= %s' % library.vnum,
+        INCLUDEDIR    = os.path.join (bld.env.PREFIX, 'include'),
+        CFLAGS_EXTRA  = '-I${includedir}/element/juce/modules',
+        install_path  = os.path.join (library.install_path, 'pkgconfig')
+    )
 
     library.export_includes = library.includes
     bld.add_group()
 
-def build_app (bld):
+def build_console_app (bld):
     appEnv = bld.env.derive()
     app = bld.program (
         source      = [ 'src/Main.cc' ],
-        includes    = common_includes(),
+        includes    = [],
         target      = 'bin/element',
-        name        = 'ElementApp',
+        name        = 'Element',
         env         = appEnv,
-        use         = [ 'LUA', 'ELEMENT', 'LIBJUCE' ],
-        linkflags   = []
+        use         = [ 'ELEMENT', 'LUA' ],
+        linkflags   = [ ],
+        defines     = []
     )
+
+def build_juce_app (bld):
+    appEnv = bld.env.derive()
+    app = bld.program (
+        source      = [ 'src/Main.cc' ] + element_juce_app_sources (bld) \
+                                        + element_juce_sources (bld),
+        includes    = common_includes(),
+        target      = 'bin/element_juce',
+        name        = 'ElementJuce',
+        env         = appEnv,
+        use         = [ 'ELEMENT', 'ELEMENT_JUCE', 'LUA', 'LUA_KV' ],
+        cflags      = ['-fvisibility=hidden' ],
+        cxxflags    = ['-fvisibility=hidden' ],
+        linkflags   = ['-fvisibility=hidden' ],
+        defines     = [ 'JUCE_DLL_BUILD=1', 'EL_JUCE_MAIN=1', 'EL_PRO=1' ]
+    )
+
+    app.includes.append ('libs/lua')
+    app.includes.append ('libs/lua-kv/src')
+    app.includes.append ('libs/lua-kv/include')
 
     if bld.host_is_linux():
         build_desktop (bld)
@@ -462,19 +557,11 @@ def build_app (bld):
         add_scripts_to (bld, '%s.app/Contents/Resources' % app.target, None)
 
     elif bld.host_is_mingw32():
-        app.env.append_unique ('LINKFLAGS_STATIC_GCC', [ '-static-libgcc', '-static-libstdc++',
-                                                         '-Wl,-Bstatic,--whole-archive', '-lwinpthread', 
-                                                         '-Wl,--no-whole-archive' ])
-        app.use += [ 'STATIC_GCC' ]
+        # app.env.append_unique ('LINKFLAGS_STATIC_GCC', [ '-static-libgcc', '-static-libstdc++',
+        #                                                  '-Wl,-Bstatic,--whole-archive', '-lwinpthread', 
+        #                                                  '-Wl,--no-whole-archive' ])
+        # app.use += [ 'STATIC_GCC' ]
         app.install_path = bld.env.BINDIR
-        if len(bld.env.DEPENDSDIR) > 0:
-            import shutil
-            def copydlls (bld):
-                d = bld.env.DEPENDSDIR
-                for dll in [ 'lib/serd-0.dll', 'lib/sord-0.dll', 'lib/sratom-0.dll', 
-                             'lib/lilv-0.dll', 'lib/suil-0.dll' ]:
-                    shutil.copy (os.path.join (d, dll), 'build/bin')
-            bld.add_post_fun (copydlls)
 
 def install_lua_files (bld):
     if not bld.host_is_linux() and not bld.host_is_mingw32():
@@ -487,7 +574,7 @@ def install_lua_files (bld):
                        cwd=path.find_dir ('scripts'))
 
     bld.install_files (join (bld.env.DOCDIR, 'lua'),
-                       bld.path.ant_glob ("build/doc/lua/**/*.*"),
+                       bld.path.ant_glob ("build/doc/lua/**/*.*", quiet=True),
                        relative_trick=True,
                        cwd=path.find_dir ('build/doc/lua'))
 
@@ -523,10 +610,21 @@ def build (bld):
         return
 
     build_liblua (bld)
-    install_lua_files (bld)
-    build_libjuce (bld)
     build_libelement (bld)
-    build_app (bld)
+    install_lua_files (bld)
+
+    # build_libjuce (bld)
+    build_libelement_juce (bld)
+    build_console_app (bld)
+    bld.add_group()
+    build_juce_app (bld)
+    # bld.add_group()
+    return
+
+    modstobuild = 'jack JLV2'.split()
+    for mod in modstobuild:
+        bld.recurse ('modules/%s.element' % mod)
+    
     # build_vst (bld)
     # build_vst3 (bld)
 
@@ -534,6 +632,15 @@ def build (bld):
         bld.recurse ('tools/lua-el')
     if bld.env.TEST:
         bld.recurse ('test')
+
+    bld.install_files (os.path.join (bld.env.PREFIX, 'include/element'),
+                       bld.path.ant_glob ("libs/element/include/element/**/*.h") + \
+                       bld.path.ant_glob ("libs/element/include/element/**/*.hpp"),
+                       relative_trick=True, cwd=bld.path.find_dir ('libs/element/include/element'))
+    
+    bld.install_files (os.path.join (bld.env.PREFIX, 'include/element/juce/modules'), \
+        bld.path.ant_glob ("libs/JUCE/modules/**/*.h"), \
+        relative_trick=True, cwd=bld.path.find_dir ('libs/JUCE/modules'))
 
 def check (ctx):
     if not os.path.exists('build/bin/test_juce'):
@@ -584,6 +691,32 @@ def resave (ctx):
     import projects
     ctx.add_pre_fun (projects.resave)
 
+def copydlls (ctx):
+    import depends
+    if ctx.host_is_windows():
+        depends.copydlls (ctx)
+
+def clean_artifacts (ctx):
+    from subprocess import call
+    root = os.path.abspath (os.path.join (os.getcwd(), 'build'))
+    if os.path.exists (root):
+        call ('bash tools/clean_artifacts.sh'.split())
+
+def deepclean (ctx):
+    from waflib import Options
+    lst = ['clean_artifacts', 'distclean']
+    Options.commands = lst + Options.commands
+
+def cleanbuild (ctx):
+    from waflib import Options
+    lst = [ 'clean', 'build' ]
+    Options.commands = lst + Options.commands
+
+def relink (ctx):
+    from waflib import Options
+    lst = [ 'clean_artifacts', 'build', 'copydlls' ]
+    Options.commands = lst + Options.commands
+
 from waflib.Build import BuildContext
 
 class ResaveBuildContext (BuildContext):
@@ -597,3 +730,7 @@ class DocsBuildContext (BuildContext):
 class VersionBumpContext (BuildContext):
     cmd = 'versionbump'
     fun = 'versionbump'
+
+class CopyDLLsContext (BuildContext):
+    cmd = 'copydlls'
+    fun = 'copydlls'

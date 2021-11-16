@@ -152,7 +152,7 @@ def configure (conf):
     conf.env['plugin_EXT'] = pat[pat.rfind('.'):]
 
     # do platform stuff
-    if is_linux() and not 'mingw' in conf.env.CXX[0]:
+    if conf.host_is_linux():
         conf.define ('LINUX', 1)
 
     elif is_mac():

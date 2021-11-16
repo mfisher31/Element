@@ -13,16 +13,39 @@ VERSION="0.47.0"
 PLUGIN_VERSION="1.47.0"
 
 juce_modules = '''
-    jlv2_host juce_audio_basics juce_audio_devices juce_audio_formats
+    juce_audio_basics juce_audio_devices juce_audio_formats
     juce_audio_processors juce_audio_utils juce_core juce_cryptography
     juce_data_structures juce_dsp juce_events juce_graphics juce_gui_basics
-    juce_gui_extra juce_osc kv_core kv_engines kv_gui kv_models
+    juce_gui_extra juce_osc
 '''
+
+juce_modules_kv = 'kv_core kv_engines kv_gui kv_models'
 
 mingw_libs = '''
     uuid wsock32 wininet version ole32 ws2_32 oleaut32
     imm32 comdlg32 shlwapi rpcrt4 winmm gdi32
 '''
+
+@conf
+def check_liblua (self):
+    self.env.LUAJIT = bool(self.options.luajit)
+    if self.env.LUAJIT:
+        self.check_cfg (package='luajit >= 2.1', uselib_store="LUA", 
+                        args='--cflags --libs', mandatory=False)
+        self.env.LUAJIT = bool (self.env.HAVE_LUA)
+    
+    if not bool(self.env.LUAJIT):
+        self.env.LUAJIT = False
+        self.check_cfg (package='lua5.4', uselib_store="LUA", 
+                        args='--cflags --libs', mandatory=False)
+        if not bool(self.env.HAVE_LUA):
+            self.check_cfg (package='lua5.3', uselib_store="LUA", 
+                            args='--cflags --libs', mandatory=False)
+        if not bool(self.env.HAVE_LUA):
+            self.check_cfg (package='lua5.2', uselib_store="LUA", 
+                            args='--cflags --libs', mandatory=True)
+
+    self.env.LUA = bool (self.env.HAVE_LUA)
 
 @conf
 def check_ladspa (self):
@@ -40,6 +63,7 @@ def check_curl (self):
 
 @conf
 def check_common (self):
+    self.check_liblua()
     self.check_curl()
     self.check (header_name='stdbool.h', mandatory=True)
 
@@ -179,11 +203,10 @@ def check_mac (self):
 
 @conf
 def check_linux (self):
-    self.check(lib='pthread', mandatory=True)
-    self.check(lib='dl', uselib_store='DL', mandatory=True)
-    
-    self.check_cxx(lib='readline', uselib_store='READLINE', mandatory=False)
-    self.define ('LUA_USE_READLINE',  bool(self.env.LIB_READLINE))
+    self.check (lib='pthread', mandatory=True)
+    self.check (lib='dl', uselib_store='DL', mandatory=True)
+    self.check (lib='m',  uselib_store='M', mandatory=True)
+    self.check_cxx (lib='readline', uselib_store='READLINE', mandatory=False)
     
     self.check_ladspa()
 
@@ -231,4 +254,20 @@ def get_juce_library_code (prefix, ext=''):
     for f in juce_modules.split():
         e = '.cpp' if f in cpp_only else extension
         code.append (prefix + '/include_' + f + e)
+    return code
+
+def kv_module_code (ctx, prefix, ext=''):
+    extension = ext
+    if len(ext) <= 0:
+        if ctx.host_is_mac():
+            extension = '.mm'
+        else:
+            extension = '.cpp'
+
+    cpp_only = []
+    code = []
+    for f in juce_modules_kv.split():
+        e = '.cpp' if f in cpp_only else extension
+        code.append (prefix + '/include_' + f + e)
+    
     return code

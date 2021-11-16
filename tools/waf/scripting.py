@@ -36,6 +36,8 @@ def options (opt):
         help="Specify path to install Lua modules")
     opt.add_option ('--scriptsdir', default='', type='string', dest='scriptsdir', \
         help="Specify path to install Lua scripts")
+    opt.add_option ('--luajit', default=False, action='store_true', dest='luajit', \
+        help="Use LuaJIT if available")
 
 def configure (self):
     self.env.LUADIR = self.options.luadir.strip()
@@ -59,12 +61,9 @@ def configure (self):
     self.env.LUA = not bool (self.options.no_lua)
     if self.env.LUA:
         self.check_cxx (
-            msg = "Checking for Lua",
+            msg = "Checking for Sol",
             includes = [
-                self.path.find_node ('libs/lua').abspath(),
-                self.path.find_node ('libs/lua/src').abspath(),
-                self.path.find_node ('libs/lua-kv').abspath(),
-                self.path.find_node ('libs/lua-kv/src').abspath()
+                self.path.find_node ('libs/element/include').abspath(),
             ],
             fragment = '''
                 #include <sol/forward.hpp>
@@ -75,7 +74,7 @@ def configure (self):
             ''',
             mandatory       = True,
             execute         = False,
-            define_name     = 'HAVE_LUA'            
+            define_name     = 'HAVE_SOL'            
         )
         self.env.LUA = bool(self.env.HAVE_LUA)
     self.define ('EL_USE_LUA', self.env.LUA)
