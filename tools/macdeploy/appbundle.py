@@ -496,8 +496,7 @@ verbose = config.verbose[0]
 # ------------------------------------------------
 
 app_bundle = config.app_bundle[0]
-# print("HI")
-# sys.exit(1)
+
 if not os.path.exists(app_bundle):
     if verbose >= 1:
         sys.stderr.write("Error: Could not find app bundle \"%s\"\n" % (app_bundle))
