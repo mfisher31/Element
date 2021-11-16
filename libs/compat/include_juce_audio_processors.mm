@@ -5,5 +5,5 @@
 
 */
 
-#include "AppConfig.h"
+#include <element/config.h>
 #include <juce_audio_processors/juce_audio_processors.mm>

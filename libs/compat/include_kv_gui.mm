@@ -5,5 +5,5 @@
 
 */
 
-#include "AppConfig.h"
+#include <element/config.h>
 #include <kv_gui/kv_gui.mm>

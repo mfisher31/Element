@@ -5,5 +5,5 @@
 
 */
 
-#include "AppConfig.h"
+#include <element/config.h>
 #include <juce_audio_formats/juce_audio_formats.cpp>

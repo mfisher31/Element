@@ -1,20 +1,8 @@
-/*
-
-    IMPORTANT! This file is auto-generated each time you save your
-    project - if you alter its contents, your changes may be overwritten!
-
-    This is the header file that your files should include in order to get all the
-    JUCE library headers. You should avoid including the JUCE headers directly in
-    your own source files, because that wouldn't pick up the correct configuration
-    options for your app.
-
-*/
 
 #pragma once
 
-#include "AppConfig.h"
-
-#include <jlv2_host/jlv2_host.h>
+#include <element/config.h>
+#include <element/juce.hpp>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -33,7 +21,6 @@
 #include <kv_engines/kv_engines.h>
 #include <kv_gui/kv_gui.h>
 #include <kv_models/kv_models.h>
-
 #include "BinaryData.h"
 
 #if defined (JUCE_PROJUCER_VERSION) && JUCE_PROJUCER_VERSION < JUCE_VERSION

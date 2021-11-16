@@ -5,5 +5,6 @@
 
 */
 
-#include "AppConfig.h"
+#include <element/config.h>
+#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 #include <juce_audio_processors/juce_audio_processors.cpp>
