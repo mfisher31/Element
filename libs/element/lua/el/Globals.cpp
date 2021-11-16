@@ -3,7 +3,7 @@
 // @classmod el.Globals
 // @pragma nostrip
 
-#include "lua-kv.hpp"
+#include <element/lua/sol_helpers.hpp>
 #include "Globals.h"
 
 static Element::Globals* el_Globals_instance (lua_State* L)
@@ -22,7 +22,7 @@ static int el_Globals_userdata (lua_State* L)
     return 1;
 }
 
-LUAMOD_API int luaopen_el_Globals (lua_State* L)
+extern "C" int luaopen_el_Globals (lua_State* L)
 {
     using Element::Globals;
     sol::state_view lua (L);
@@ -91,6 +91,6 @@ LUAMOD_API int luaopen_el_Globals (lua_State* L)
         require ('el.Session')
     )");
 
-    sol::stack::push (L, kv::lua::remove_and_clear (M, "Globals"));
+    sol::stack::push (L, element::lua::remove_and_clear (M, "Globals"));
     return 1;
 }

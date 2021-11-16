@@ -2,11 +2,11 @@
 // @classmod el.Session
 // @pragma nostrip
 
-#include "lua-kv.hpp"
+#include <element/lua/sol_helpers.hpp>
 #include "session/Node.h"
 #include "session/Session.h"
 
-LUAMOD_API int luaopen_el_Session (lua_State* L) {
+extern "C" int luaopen_el_Session (lua_State* L) {
     using namespace Element;
     
     sol::state_view lua (L);
@@ -72,6 +72,6 @@ LUAMOD_API int luaopen_el_Session (lua_State* L) {
        #endif
     );
 
-    sol::stack::push (L, kv::lua::remove_and_clear (M, "Session"));
+    sol::stack::push (L, element::lua::remove_and_clear (M, "Session"));
     return 1;
 }

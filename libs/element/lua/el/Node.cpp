@@ -2,10 +2,10 @@
 // @classmod el.Node
 // @pragma nostrip
 
-#include "lua-kv.hpp"
+#include <element/lua/sol_helpers.hpp>
 #include "session/Node.h"
 
-LUAMOD_API int luaopen_el_Node (lua_State* L) {
+extern "C" int luaopen_el_Node (lua_State* L) {
     using namespace Element;
     using namespace sol;
 
@@ -133,6 +133,6 @@ LUAMOD_API int luaopen_el_Node (lua_State* L) {
        #endif
     );
 
-    sol::stack::push (L, kv::lua::remove_and_clear (M, "Node"));
+    sol::stack::push (L, element::lua::remove_and_clear (M, "Node"));
     return 1;
 }

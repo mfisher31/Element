@@ -2,11 +2,11 @@
 // @classmod el.CommandManager
 // @pragma nostrip
 
-#include "lua-kv.hpp"
+#include <element/lua/sol_helpers.hpp>
 #include "session/CommandManager.h"
 #include "Commands.h"
 
-LUAMOD_API int luaopen_el_CommandManager (lua_State* L)
+extern "C" int luaopen_el_CommandManager (lua_State* L)
 {
     using namespace Element;
     sol::state_view lua (L);
@@ -61,6 +61,6 @@ LUAMOD_API int luaopen_el_CommandManager (lua_State* L)
         sol::base_classes, sol::bases<ApplicationCommandManager>()
     );
 
-    sol::stack::push (L, kv::lua::remove_and_clear (M, "CommandManager"));
+    sol::stack::push (L, M["CommandManager"]);
     return 1;
 }
