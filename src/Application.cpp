@@ -28,20 +28,19 @@
 #include "session/PluginManager.h"
 
 namespace Element {
+Application::Application() {}
+Application::~Application() {}
 
-Application::Application() { }
-Application::~Application() { }
+const String Application::getApplicationName() { return Util::appName(); }
+const String Application::getApplicationVersion() { return ProjectInfo::versionString; }
+bool Application::moreThanOneInstanceAllowed() { return true; }
 
-const String Application::getApplicationName()         { return Util::appName(); }
-const String Application::getApplicationVersion()      { return ProjectInfo::versionString; }
-bool Application::moreThanOneInstanceAllowed()         { return true; }
-
-void Application::initialise (const String& commandLine) 
+void Application::initialise (const String& commandLine)
 {
     backend = std::make_unique<JuceBackend> (this);
     if (maybeLaunchSlave (commandLine))
         return;
-    
+
     if (sendCommandLineToPreexistingInstance())
     {
         quit();
@@ -53,19 +52,19 @@ void Application::initialise (const String& commandLine)
     launchApplication();
 }
 
-void Application::actionListenerCallback (const String& message) 
+void Application::actionListenerCallback (const String& message)
 {
     if (message == "finishedLaunching")
         finishLaunching();
 }
 
-void Application::shutdown() 
+void Application::shutdown()
 {
     if (! backend || ! controller)
         return;
 
     slaves.clearQuick (true);
-    
+
     {
         auto& world = backend->globals();
         auto engine (world.getAudioEngine());
@@ -77,10 +76,10 @@ void Application::shutdown()
 
         controller->saveSettings();
         controller->deactivate();
-        
+
         plugins.saveUserPlugins (settings);
         midi.writeSettings (settings);
-        
+
         if (auto el = world.getDeviceManager().createStateXml())
             props->setValue ("devices", el.get());
         if (auto keymappings = world.getCommandManager().getKeyMappings()->createXml (true))
@@ -95,15 +94,15 @@ void Application::shutdown()
     backend.reset();
 }
 
-void Application::systemRequestedQuit() 
+void Application::systemRequestedQuit()
 {
     if (! controller)
     {
         Application::quit();
         return;
     }
-    
-    #if defined (EL_PRO)
+
+#if defined(EL_PRO)
     auto* sc = controller->findChild<SessionController>();
     auto& world = backend->globals();
     if (world.getSettings().askToSaveSession())
@@ -112,9 +111,8 @@ void Application::systemRequestedQuit()
         // - 1 if the first button was pressed ('yes')
         // - 2 if the middle button was pressed ('no')
         const int res = ! sc->hasSessionChanged() ? 2
-            : AlertWindow::showYesNoCancelBox (AlertWindow::NoIcon, "Save Session",
-                "This session may have changes. Would you like to save before exiting?");
-        
+                                                  : AlertWindow::showYesNoCancelBox (AlertWindow::NoIcon, "Save Session", "This session may have changes. Would you like to save before exiting?");
+
         if (res == 1)
             sc->saveSession();
         if (res != 0)
@@ -128,9 +126,7 @@ void Application::systemRequestedQuit()
         }
         else
         {
-            if (AlertWindow::showOkCancelBox (AlertWindow::NoIcon, "Save Session",
-                    "This session has not been saved to disk yet.\nWould you like to before exiting?",
-                    "Yes", "No"))
+            if (AlertWindow::showOkCancelBox (AlertWindow::NoIcon, "Save Session", "This session has not been saved to disk yet.\nWould you like to before exiting?", "Yes", "No"))
             {
                 sc->saveSession();
             }
@@ -139,7 +135,7 @@ void Application::systemRequestedQuit()
         Application::quit();
     }
 
-    #else // lite and solo
+#else // lite and solo
     auto* gc = controller->findChild<GraphController>();
     if (world->getSettings().askToSaveSession())
     {
@@ -147,11 +143,10 @@ void Application::systemRequestedQuit()
         // - 1 if the first button was pressed ('yes')
         // - 2 if the middle button was pressed ('no')
         const int res = ! gc->hasGraphChanged() ? 2
-            : AlertWindow::showYesNoCancelBox (AlertWindow::NoIcon, "Save Graph",
-                "This graph may have changes. Would you like to save before exiting?");
+                                                : AlertWindow::showYesNoCancelBox (AlertWindow::NoIcon, "Save Graph", "This graph may have changes. Would you like to save before exiting?");
         if (res == 1)
             gc->saveGraph (false);
-        
+
         if (res != 0)
             Application::quit();
     }
@@ -160,15 +155,15 @@ void Application::systemRequestedQuit()
         gc->saveGraph (false);
         Application::quit();
     }
-    #endif
+#endif
 }
 
-void Application::anotherInstanceStarted (const String& commandLine) 
+void Application::anotherInstanceStarted (const String& commandLine)
 {
     if (! controller)
         return;
-    
-    #if EL_PRO
+
+#if EL_PRO
     if (auto* sc = controller->findChild<SessionController>())
     {
         const auto path = commandLine.unquoted().trim();
@@ -181,7 +176,7 @@ void Application::anotherInstanceStarted (const String& commandLine)
                 sc->importGraph (file);
         }
     }
-    #else
+#else
     if (auto* gc = controller->findChild<GraphController>())
     {
         const auto path = commandLine.unquoted().trim();
@@ -192,15 +187,15 @@ void Application::anotherInstanceStarted (const String& commandLine)
                 gc->openGraph (file);
         }
     }
-    #endif
+#endif
 }
 
-void Application::resumed() 
+void Application::resumed()
 {
-    #if JUCE_WINDOWS
+#if JUCE_WINDOWS
     auto& devices (backend->globals().getDeviceManager());
     devices.restartLastAudioDevice();
-    #endif
+#endif
 }
 
 void Application::finishLaunching()
@@ -214,28 +209,9 @@ void Application::finishLaunching()
 
     auto modsdir = File::getCurrentWorkingDirectory().getChildFile ("build/modules");
 
-    
-
-    // Element::Module* mod1 = new Element::Module (File::getCurrentWorkingDirectory()
-    //     .getChildFile ("build/modules/LV2.element")
-    //     .getFullPathName().toStdString(), *world);
-    // mod1->open();
-
-    // Element::Module mod2 (File::getCurrentWorkingDirectory()
-    //     .getChildFile ("build/modules/jack.element")
-    //     .getFullPathName().toStdString(), *world);
-    // mod2.open();
-    // mod2.close();
-
     controller->run();
 
-//    #ifndef EL_FREE
-// FIXME:
-//     if (world.getSettings().checkForUpdates())
-//         CurrentVersion::checkAfterDelay (12 * 1000, false);
-//    #endif
-
-    #if EL_PRO
+#if EL_PRO
     if (auto* sc = controller->findChild<SessionController>())
     {
         const auto path = world.cli.commandLine.unquoted().trim();
@@ -246,7 +222,7 @@ void Application::finishLaunching()
                 sc->openFile (File (path));
         }
     }
-    #endif
+#endif
 }
 
 void Application::printCopyNotice()
@@ -270,15 +246,15 @@ bool Application::maybeLaunchSlave (const String& commandLine)
         {
             if (slave->initialiseFromCommandLine (commandLine, pid))
             {
-                #if JUCE_MAC
+#if JUCE_MAC
                 Process::setDockIconVisible (false);
-                #endif
+#endif
                 juce::shutdownJuce_GUI();
                 return true;
             }
         }
     }
-    
+
     return false;
 }
 
@@ -287,9 +263,8 @@ void Application::launchApplication()
     if (backend->has_launched())
         return;
     backend->initialize();
-    
 }
 
 void Application::initializeModulePath() {}
 
-}
+} // namespace Element

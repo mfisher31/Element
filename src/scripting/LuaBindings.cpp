@@ -33,8 +33,8 @@
 #include "session/Session.h"
 #include "DataPath.h"
 #include "Settings.h"
-#include "sol/sol.hpp"
-#include "lua-kv.hpp"
+#include <sol/sol.hpp>
+#include <element/lua/sol_helpers.hpp>
 
 #ifndef EL_LOCAL_LUA_PATHS
  #define EL_LOCAL_LUA_PATHS 0
