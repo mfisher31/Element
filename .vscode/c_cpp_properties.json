@@ -103,6 +103,7 @@
             "includePath": [
                 "/usr/local/include/*",
                 "/usr/include/*",
+                "/usr/include/lua5.3",
                 "/usr/include/lilv-0/*",
                 "/usr/include/suil-0/*",
                 "/usr/include/serd-0/*",
@@ -123,7 +124,6 @@
                 "${workspaceRoot}/libs/lua-kv/src/*"
             ],
             "defines": [
-                "LUA_USE_READLINE=1",
                 "EL_LUADIR=\"/usr/share/element/lua\"",
                 "EL_SCRIPTSDIR=\"/usr/share/element/scripts\"",
                 "JUCE_PLUGINHOST_AU=0"
