@@ -18,7 +18,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include "kv/lua/object.hpp"
+#include <element/lua/object.hpp>
 #include "gui/nodes/ScriptNodeEditor.h"
 #include "gui/LookAndFeel.h"
 #include "scripting/LuaBindings.h"
@@ -393,7 +393,7 @@ void ScriptNodeEditor::updatePreview()
                         break;
                 }
 
-                if (auto* const c = kv::lua::object_userdata<Component> (editor))
+                if (auto* const c = element::lua::object_userdata<Component> (editor))
                 {
                     comp = c;
                     widget = editor;

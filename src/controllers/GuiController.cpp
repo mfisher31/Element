@@ -363,6 +363,8 @@ void GuiController::run()
     }
 
     mainWindow->addToDesktop();
+
+
     Desktop::getInstance().setGlobalScaleFactor(
         getWorld().getSettings().getDesktopScale());
     

@@ -23,9 +23,9 @@
 // @classmod el.MidiPipe
 // @pragma nostrip
 
-#include "lua.hpp"
-#include "kv/lua/midi_buffer.hpp"
-#include "kv/lua/factories.hpp"
+#include <sol/sol.hpp>
+#include "element/lua/midi_buffer.hpp"
+#include "element/lua/factories.hpp"
 #include "engine/MidiPipe.h"
 
 namespace Element {
@@ -111,7 +111,7 @@ LuaMidiPipe::~LuaMidiPipe()
 
 LuaMidiPipe** LuaMidiPipe::create (lua_State* L, int numReserved)
 {
-    auto** pipe = kv::lua::new_userdata <LuaMidiPipe> (L, "el.MidiPipe");
+    auto** pipe = element::lua::new_userdata <LuaMidiPipe> (L, "el.MidiPipe");
     (*pipe)->state = L;
     (*pipe)->setSize (numReserved);
     (*pipe)->used = 0;
@@ -124,7 +124,7 @@ void LuaMidiPipe::setSize (int newsize)
 
     while (buffers.size() < newsize)
     {
-        buffers.add (kv::lua::new_midibuffer (state));
+        buffers.add (element::lua::new_midibuffer (state));
         refs.add (luaL_ref (state, LUA_REGISTRYINDEX));
     }
 
@@ -237,6 +237,8 @@ static const luaL_Reg methods[] = {
     { nullptr, nullptr }
 };
 
+#include <element/element.h>
+extern "C" EL_API
 int luaopen_el_MidiPipe (lua_State* L)
 {
     if (luaL_newmetatable (L, "el.MidiPipe")) {

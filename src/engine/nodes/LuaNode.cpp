@@ -18,9 +18,12 @@
 */
 
 #include <math.h>
-#include "sol/sol.hpp"
-#include "lua-kv.h"
-#include "kv/lua/factories.hpp"
+
+#include <sol/sol.hpp>
+
+#include <element/lua/factories.hpp>
+#include <element/element.h>
+#include <element/juce.hpp>
 
 #include "ElementApp.h"
 #include "engine/nodes/LuaNode.h"
@@ -229,7 +232,7 @@ struct LuaNode::Context
 
                 if (ok)
                 {
-                    audioBuffer = kv::lua::new_userdata<AudioBuffer<float>> (state, LKV_MT_AUDIO_BUFFER_32);
+                    audioBuffer = element::lua::new_userdata<AudioBuffer<float>> (state, LKV_MT_AUDIO_BUFFER_32);
                     audioBufRef = luaL_ref (state, LUA_REGISTRYINDEX);
                     ok = audioBufRef != LUA_REFNIL && audioBufRef != LUA_NOREF;
                 }

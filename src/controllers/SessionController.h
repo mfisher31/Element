@@ -25,7 +25,7 @@
 #include "Signals.h"
 
 namespace Element {
-class SessionController : public AppController::Child
+class JUCE_API SessionController : public AppController::Child
 {
 public:
     SessionController();

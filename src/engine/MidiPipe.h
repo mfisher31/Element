@@ -21,11 +21,13 @@
 
 #include "JuceHeader.h"
 
+// hacky workaround
 struct lua_State;
-namespace kv {
+namespace element {
 namespace lua {
     struct MidiBufferImpl;
 }}
+// end workaround
 
 namespace Element {
 
@@ -87,7 +89,7 @@ public:
 
 private:
     lua_State* state = nullptr;
-    Array<kv::lua::MidiBufferImpl**> buffers;
+    Array<element::lua::MidiBufferImpl**> buffers;
     Array<int> refs;
     int used { 0 };
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LuaMidiPipe);

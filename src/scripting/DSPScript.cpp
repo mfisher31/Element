@@ -17,7 +17,8 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include "kv/lua/factories.hpp"
+#include <element/lua/factories.hpp>
+
 #include "engine/MidiPipe.h"
 #include "scripting/DSPScript.h"
 
@@ -151,7 +152,7 @@ DSPScript::DSPScript (sol::table tbl)
 
     if (ok)
     {
-        audio = kv::lua::new_userdata<AudioBuffer<float>> (
+        audio = element::lua::new_userdata<AudioBuffer<float>> (
             L, LKV_MT_AUDIO_BUFFER_32);
         audioRef = luaL_ref (L, LUA_REGISTRYINDEX);
         ok = audioRef != LUA_REFNIL && audioRef != LUA_NOREF;

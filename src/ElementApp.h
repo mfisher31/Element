@@ -26,19 +26,6 @@ namespace kv { }
 using namespace kv;
 
 //=============================================================================
-#ifdef __cplusplus
- #define EL_EXTERN extern "C"
-#else
- #define EL_EXTERN
-#endif
-
-#ifdef _WIN32
- #define EL_EXPORT EL_EXTERN __declspec(dllexport)
-#else
- #define EL_EXPORT EL_EXTERN __attribute__((visibility("default")))
-#endif
-
-//=============================================================================
 namespace Element {
 
 using PortType = kv::PortType;

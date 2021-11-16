@@ -49,8 +49,6 @@ public:
     // dragging stuff
     File getDraggableFile() const override
     {
-        std::clog << "get draggable file\n";
-
         if (item.isFile())
             return item.getFile();
 

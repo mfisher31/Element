@@ -25,7 +25,7 @@ namespace Element {
 
 class Settings;
 
-class MidiEngine : public ChangeBroadcaster
+class JUCE_API MidiEngine : public ChangeBroadcaster
 {
 public:
     MidiEngine();

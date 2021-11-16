@@ -26,6 +26,9 @@
 #define EL_USE_NEW_SYSTRAY_ICON 0
 #define EL_SYSTRAY_MIN_SIZE 22
 
+namespace element {
+static bool running_in_wine();
+}
 namespace Element {
 
 enum SystemTrayMouseAction
@@ -73,6 +76,9 @@ SystemTray::SystemTray()
 
 void SystemTray::setEnabled (bool enabled)
 {
+    if (element::running_in_wine())
+        return;
+
     if (enabled)
     {
         if (instance == nullptr)
@@ -160,4 +166,20 @@ void SystemTray::mouseDown (const MouseEvent& ev)
    #endif
 }
 
+} // Element namespace
+
+#if _WIN32
+#include "windows.h"
+#endif
+
+namespace element {
+
+#if _WIN32
+bool running_in_wine() {
+    HMODULE ntdll = GetModuleHandleA ("ntdll");
+    return ntdll != nullptr && GetProcAddress (ntdll, "wine_get_version") != nullptr;
+}
+#else
+bool running_in_wine() { return false; }
+#endif
 }

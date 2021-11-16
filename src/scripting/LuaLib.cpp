@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#if ! HAVE_LUA
+#include <element/config.h>
+#if ! HAVE_LUA && ! HAVE_LUAJIT
 
 #if defined(JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED)
  #pragma error "Cannot include JUCE before LuaLib.cpp"

@@ -24,7 +24,7 @@ namespace Element {
 
 class Globals;
 
-class Settings :  public ApplicationProperties
+class JUCE_API Settings :  public ApplicationProperties
 {
 public:
     Settings();
