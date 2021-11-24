@@ -5,7 +5,7 @@ AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignEscapedNewlines: Left
 # AlignOperands: Align    # v12
-AlignTrailingComments: false
+AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: false
 AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false
@@ -76,6 +76,7 @@ SpacesInSquareBrackets: false
 Standard: "c++17"
 TabWidth: 4
 UseTab: Never
+ForEachMacros: [ EL_FEATURES_FOREACH, BOOST_FOREACH ]
 ---
 Language: ObjC
 BasedOnStyle: Chromium
