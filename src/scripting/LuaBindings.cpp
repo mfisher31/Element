@@ -58,10 +58,6 @@ struct unique_usertype_traits<ReferenceCountedObjectPtr<T>> {
 #include "../../element/lua/el/Session.cpp"
 
 extern "C" {
-extern int luaopen_el_audio (lua_State* L);
-extern int luaopen_el_bytes (lua_State*);
-extern int luaopen_el_midi (lua_State*);
-extern int luaopen_el_round (lua_State*);
 extern int luaopen_el_AudioBuffer32 (lua_State*);
 extern int luaopen_el_AudioBuffer64 (lua_State*);
 extern int luaopen_el_Bounds (lua_State*);
@@ -303,22 +299,6 @@ static int searchInternalModules (lua_State* L)
     
 #define EL_LUA_INTERNAL_MOD_KV      1
 #if defined (EL_LUA_INTERNAL_MOD_KV)
-    else if (mod == "kv.audio")
-    {
-        sol::stack::push (L, luaopen_el_audio);
-    }
-    else if (mod == "kv.midi")
-    {
-        sol::stack::push (L, luaopen_el_midi);
-    }
-    else if (mod == "kv.bytes")
-    {
-        sol::stack::push (L, luaopen_el_bytes);
-    }
-    else if (mod == "kv.round")
-    {
-        sol::stack::push (L, luaopen_el_round);
-    }
     else if (mod == "kv.AudioBuffer32")
     {
         sol::stack::push (L, luaopen_el_AudioBuffer32);
@@ -409,26 +389,27 @@ void clearGlobals (sol::state_view& view)
 //==============================================================================
 void initializeState (sol::state_view& view)
 {
-    view.open_libraries ();
+    // view.open_libraries ();
 
-    auto package = view["package"];
-    auto newSearchers = view.create_table();
-    newSearchers.add (package ["searchers"][1]);
-    newSearchers.add (searchInternalModules);
-    sol::table packageSearchers = package["searchers"];
-    for (int i = 2; i <= packageSearchers.size(); ++i)
-        newSearchers.add (package["searchers"][i]);
-    package["searchers"] = newSearchers;
+    // const char* skey = LUA_VERSION_NUM < 502 ? "loaders" : "searchers";
+    // auto package = view["package"];
+    // auto newSearchers = view.create_table();
+    // newSearchers.add (package [skey][1]);
+    // newSearchers.add (searchInternalModules);
+    // sol::table packageSearchers = package[skey];
+    // for (int i = 2; i <= packageSearchers.size(); ++i)
+    //     newSearchers.add (package[skey][i]);
+    // package[skey] = newSearchers;
 
-    package["path"]     = getLuaPath().toStdString();
-    package["cpath"]    = getLuaCPath().toStdString();
-    package["spath"]    = getScriptSearchPath().toStdString();
+    // package["path"]     = getLuaPath().toStdString();
+    // package["cpath"]    = getLuaCPath().toStdString();
+    // package["spath"]    = getScriptSearchPath().toStdString();
 }
 
 void initializeState (sol::state_view& view, Globals& g)
 {
     initializeState (view);
-    setGlobals (view, g);
+    // setGlobals (view, g);
 }
 
 }}

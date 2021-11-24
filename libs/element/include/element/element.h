@@ -1,5 +1,5 @@
-#ifndef EL_ELEMENT_H_INCLUDED
-#define EL_ELEMENT_H_INCLUDED
+#ifndef ELEMENT_H_INCLUDED
+#define ELEMENT_H_INCLUDED
 
 #include <stdint.h>
 
@@ -27,24 +27,30 @@ extern "C" {
     #define EL_EXPORT EL_EXTERN EL_API
 #endif
 
+// export macro: includes extern C if needed followed by visibility attribute;
 #ifndef EL_EXPORT
     #define EL_EXPORT
 #endif
 
-#define LKV_MT_AUDIO_BUFFER_64              "el.AudioBuffer64"
-#define LKV_MT_AUDIO_BUFFER_32              "el.AudioBuffer32"
-#define LKV_MT_BYTE_ARRAY                   "el.ByteArray"
-#define LKV_MT_MIDI_MESSAGE                 "el.MidiMessage"
-#define LKV_MT_MIDI_BUFFER                  "el.MidiBuffer"
-#define LKV_MT_MIDI_PIPE                    "el.MidiPipe"
-#define LKV_MT_VECTOR                       "el.Vector"
+#define EL_MT_AUDIO_BUFFER_64              "el.AudioBuffer64"
+#define EL_MT_AUDIO_BUFFER_32              "el.AudioBuffer32"
+#define EL_MT_BYTE_ARRAY                   "el.ByteArray"
+#define EL_MT_MIDI_MESSAGE                 "el.MidiMessage"
+#define EL_MT_MIDI_BUFFER                  "el.MidiBuffer"
+#define EL_MT_MIDI_PIPE                    "el.MidiPipe"
+#define EL_MT_VECTOR                       "el.Vector"
 
-typedef struct ElementContext ElementContext;
-
-uint64_t eds_time_ns();
 
 #ifdef __cplusplus
-}
+
+#define EL_DISABLE_COPY(ClassName)        \
+    ClassName(const ClassName&) = delete; \
+    ClassName& operator=(const ClassName&) = delete;
+#define EL_DISABLE_MOVE(ClassName)         \
+    ClassName(const ClassName&&) = delete; \
+    ClassName& operator=(const ClassName&&) = delete;
+
+} // extern "C"
 #endif
 
 #endif

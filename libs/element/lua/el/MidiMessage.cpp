@@ -7,12 +7,12 @@
 #include <sol/sol.hpp>
 #include "packed.h"
 
-#define LKV_MT_MIDI_MESSAGE_TYPE "el.MidiMessageClass"
+#define EL_MT_MIDI_MESSAGE_TYPE "el.MidiMessageClass"
 
 static auto create_message (lua_State* L) {
     auto** userdata = (juce::MidiMessage**) lua_newuserdata (L, sizeof (juce::MidiMessage**));
     *userdata = new juce::MidiMessage();
-    luaL_setmetatable (L, LKV_MT_MIDI_MESSAGE);
+    luaL_setmetatable (L, EL_MT_MIDI_MESSAGE);
     return userdata;
 }
 
@@ -553,19 +553,19 @@ static const luaL_Reg midimessage_methods[] = {
 extern "C" {
 EL_API
 int luaopen_el_MidiMessage (lua_State* L) {
-    if (luaL_newmetatable (L, LKV_MT_MIDI_MESSAGE)) {
+    if (luaL_newmetatable (L, EL_MT_MIDI_MESSAGE)) {
         lua_pushvalue (L, -1);               /* duplicate the metatable */
         lua_setfield (L, -2, "__index");     /* mt.__index = mt */
         luaL_setfuncs (L, midimessage_methods, 0);
         lua_pop (L, 1);
     }
 
-    if (luaL_newmetatable (L, LKV_MT_MIDI_MESSAGE_TYPE)) {
+    if (luaL_newmetatable (L, EL_MT_MIDI_MESSAGE_TYPE)) {
         lua_pop (L, 1);
     }
 
     lua_newtable (L);
-    luaL_setmetatable (L, LKV_MT_MIDI_MESSAGE_TYPE);
+    luaL_setmetatable (L, EL_MT_MIDI_MESSAGE_TYPE);
     lua_pushcfunction (L, midimessage_new);
     lua_setfield (L, -2, "new");
     return 1;

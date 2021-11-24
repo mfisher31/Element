@@ -14,9 +14,6 @@
 #include <string.h>
 #include <strings.h>
 
-#include "Globals.h"
-#include "scripting/LuaBindings.h"
-#include "scripting/ScriptingEngine.h"
 #include "sol/sol.hpp"
 
 #if !defined(LUA_PROMPT)

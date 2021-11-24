@@ -36,7 +36,7 @@ typedef struct kv_vector_impl_t        Vector;
 //=============================================================================
 kv_vector_t* kv_vector_new (lua_State* L, int size) {
     Vector* vec = lua_newuserdata (L, sizeof (Vector));
-    luaL_setmetatable (L, LKV_MT_VECTOR);
+    luaL_setmetatable (L, EL_MT_VECTOR);
 
     if (size > 0) {
         vec->size = vec->used = size;
@@ -156,7 +156,7 @@ static int f_new (lua_State* L) {
 // @param vec The vector to clear
 // @function clear
 static int f_clear (lua_State* L) {
-    kv_vector_t* vec = luaL_checkudata (L, 1, LKV_MT_VECTOR);
+    kv_vector_t* vec = luaL_checkudata (L, 1, EL_MT_VECTOR);
     if (vec->used <= 0 || vec->values == NULL) {
         return 0;
     }
@@ -196,7 +196,7 @@ static const luaL_Reg vector_f[] = {
 };
 
 void kv_vector_metatable (lua_State* L) {
-    if (0 != luaL_newmetatable (L, LKV_MT_VECTOR)) {
+    if (0 != luaL_newmetatable (L, EL_MT_VECTOR)) {
         luaL_setfuncs (L, vector_m, 0);
     }
 }

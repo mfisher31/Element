@@ -13,7 +13,7 @@ def element_binary (opts):
             binary = 'build/bin/element_juce'
     if not os.path.exists (binary):
         raise Exception ("Element binary not found: " + binary)
-    return [binary]
+    return [os.path.abspath (binary)]
 
 def set_local_lua_paths():
     os.environ ['LUA_PATH']             = "libs/lua-kv/src/?.lua;libs/element/lua/?.lua"
@@ -42,6 +42,9 @@ def main():
     if opts.wine:
         cmd.append ('wine')
     cmd += element_binary (opts)
+
+    print ("Starting application")
+    print ("Binary: %s" % ' '.join(cmd))
     call (cmd)
 
 if __name__ == '__main__':

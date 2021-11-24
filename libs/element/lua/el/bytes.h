@@ -5,10 +5,10 @@
 extern "C" {
 #endif
 
-typedef struct _kv_bytes_t {
+typedef struct elBytes {
     size_t      size;
     uint8_t*    data;
-} kv_bytes_t;
+} elBytes;
 
 #ifdef __cplusplus
 }

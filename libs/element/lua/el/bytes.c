@@ -34,7 +34,7 @@ extern "C" {
 
 #include <element/element.h>
 
-void kv_bytes_init (kv_bytes_t* b, size_t size) {
+void kv_bytes_init (elBytes* b, size_t size) {
     b->data = NULL;
     b->size = size;
     if (size > 0) {
@@ -44,7 +44,7 @@ void kv_bytes_init (kv_bytes_t* b, size_t size) {
     }
 }
 
-void kv_bytes_free (kv_bytes_t* b) {
+void kv_bytes_free (elBytes* b) {
     b->size = 0;
     if (b->data != NULL) {
         free (b->data);
@@ -52,11 +52,11 @@ void kv_bytes_free (kv_bytes_t* b) {
     }
 }
 
-uint8_t kv_bytes_get (kv_bytes_t* b, lua_Integer index) {
+uint8_t kv_bytes_get (elBytes* b, lua_Integer index) {
     return b->data [index];
 }
 
-void kv_bytes_set (kv_bytes_t* b, lua_Integer index, uint8_t value) {
+void kv_bytes_set (elBytes* b, lua_Integer index, uint8_t value) {
     b->data[index] = value;
 }
 
@@ -65,8 +65,8 @@ void kv_bytes_set (kv_bytes_t* b, lua_Integer index, uint8_t value) {
 // @int size Size in bytes to allocate
 // @treturn el.ByteArray The new byte array.
 static int f_new (lua_State* L) {
-    kv_bytes_t* b = (kv_bytes_t*) lua_newuserdata (L, sizeof (kv_bytes_t));
-    luaL_setmetatable (L, LKV_MT_BYTE_ARRAY);
+    elBytes* b = (elBytes*) lua_newuserdata (L, sizeof (elBytes));
+    luaL_setmetatable (L, EL_MT_BYTE_ARRAY);
     size_t size = lua_isnumber (L, 1) ? (size_t) lua_tonumber (L, 1) : 0;
     kv_bytes_init (b, size);
     return 1;
@@ -76,7 +76,7 @@ static int f_new (lua_State* L) {
 // @function free
 // @param bytes The array to free
 static int f_free (lua_State* L) {
-    kv_bytes_t* b = (kv_bytes_t*) lua_touserdata (L, 1);
+    elBytes* b = (elBytes*) lua_touserdata (L, 1);
     kv_bytes_free (b);
     return 0;
 }
@@ -86,7 +86,7 @@ static int f_free (lua_State* L) {
 // @param bytes Bytes to get from
 // @int index Index in the array
 static int f_get (lua_State* L) {
-    kv_bytes_t* b = (kv_bytes_t*) lua_touserdata (L, 1);
+    elBytes* b = (elBytes*) lua_touserdata (L, 1);
     lua_Integer index = luaL_checkinteger (L, 2);
     luaL_argcheck (L, b != NULL, 1, "`bytes' expected");
     luaL_argcheck (L, index >= 1 && index <= b->size, 2, "index out of range");
@@ -100,7 +100,7 @@ static int f_get (lua_State* L) {
 // @int index Index in the array
 // @int value Value to set in the range 0x00 to 0xFF inclusive
 static int f_set (lua_State* L) {
-    kv_bytes_t* b = (kv_bytes_t*) lua_touserdata (L, 1);
+    elBytes* b = (elBytes*) lua_touserdata (L, 1);
     lua_Integer index = luaL_checkinteger (L, 2);
     lua_Integer value = luaL_checkinteger (L, 3);
     luaL_argcheck (L, b != NULL, 1, "`bytes' expected");
@@ -114,7 +114,7 @@ static int f_set (lua_State* L) {
 // @param bytes Target bytes
 // @treturn int The size in bytes.
 static int f_size (lua_State* L) {
-    kv_bytes_t* b = (kv_bytes_t*) lua_touserdata (L, 1);
+    elBytes* b = (elBytes*) lua_touserdata (L, 1);
     luaL_argcheck (L, b != NULL, 1, "`bytes' expected");
     lua_pushinteger (L, (lua_Integer) b->size);
     return 1;
@@ -183,7 +183,7 @@ static const luaL_Reg bytes_m[] = {
 
 EL_API
 int luaopen_el_bytes (lua_State* L) {
-    if (luaL_newmetatable (L, LKV_MT_BYTE_ARRAY)) {
+    if (luaL_newmetatable (L, EL_MT_BYTE_ARRAY)) {
         lua_pushvalue (L, -1);               /* duplicate the metatable */
         lua_setfield (L, -2, "__index");     /* mt.__index = mt */
         luaL_setfuncs (L, bytes_m, 0);

@@ -185,8 +185,10 @@ def element_sources (ctx):
         libs/element/lua/el/vector.c
     '''.split()
     lib_sources = '''
+        libs/element/src/bindings.cpp
         libs/element/src/context.cpp
         libs/element/src/scripting.cpp
+        libs/element/src/strings.cpp
         '''.split()
     if ctx.host_is_windows():
         lib_sources.append ('libs/element/src/dlfcn-win32.c')
@@ -393,7 +395,8 @@ def build_libelement (bld):
         features    = 'cxx cxxshlib',
         source      = element_sources (bld),
         includes    = [
-            'libs/element/include'
+            'libs/element/include',
+            'build/include'
         ],
         target      = 'lib/element',
         name        = 'ELEMENT',
@@ -431,6 +434,7 @@ def build_libelement_juce (bld):
         env.append_unique (k, [ '-fPIC' ])
     
     jsources = juce_sources (bld)
+    
     el_lua_sources = '''
         libs/element/lua/el/AudioBuffer32.cpp
         libs/element/lua/el/AudioBuffer64.cpp
@@ -449,18 +453,23 @@ def build_libelement_juce (bld):
         libs/element/lua/el/File.cpp
         libs/element/lua/el/Slider.cpp
     '''.split()
-
+    
+    # NOTE: here for testing purposes
+    app_sources = []
+    # app_sources = element_juce_app_sources (bld) + \
+    #               element_juce_sources (bld)
+    
     library = bld (
         features    = 'cxx cxxshlib',
-        source      = el_lua_sources + jsources,
+        source      = el_lua_sources + jsources + app_sources,
         includes    = common_includes(),
         target      = 'lib/element-juce',
         name        = 'ELEMENT_JUCE',
         env         = env,
-        defines     = [],
+        defines     = [ 'EL_PRO=1' ],
         use         = [ 'DEPENDS', 'ELEMENT', 'LUA' ],
         cflags      = [ '-fvisibility=hidden' ],
-        cxxflags    = [ '-fvisibility=hidden' ],
+        cxxflags    = [ '-fvisibility=hidden', '-Wno-implicit-int-float-conversion' ],
         linkflags   = [ '-fvisibility=hidden' ],
         vnum        = '0.47.0',
         install_path = bld.env.LIBDIR
@@ -514,34 +523,34 @@ def build_libelement_juce (bld):
     bld.add_group()
 
 def build_console_app (bld):
-    appEnv = bld.env.derive()
-    app = bld.program (
-        source      = [ 'src/Main.cc' ],
-        includes    = [],
-        target      = 'bin/element',
-        name        = 'Element',
-        env         = appEnv,
-        use         = [ 'ELEMENT', 'LUA' ],
-        linkflags   = [ ],
-        defines     = []
-    )
+    bld.recurse ('console')
 
 def build_juce_app (bld):
-    appEnv = bld.env.derive()
-    app = bld.program (
-        source      = [ 'src/Main.cc' ] + element_juce_app_sources (bld) \
-                                        + element_juce_sources (bld),
+    import plugins
+    appEnv = plugins.derive_env (bld)
+    
+    sources = [ 'UI/UI.cpp' ]
+    sources += element_juce_app_sources (bld) + \
+               element_juce_sources (bld)
+
+    app = bld (
+        features    = 'cxx cxxshlib',
+        source      = sources,
         includes    = common_includes(),
-        target      = 'bin/element_juce',
-        name        = 'ElementJuce',
+        target      = 'modules/UI.element/UI',
+        name        = 'ELEMENT_UI',
         env         = appEnv,
-        use         = [ 'ELEMENT', 'ELEMENT_JUCE', 'LUA', 'LUA_KV' ],
+        use         = [ 'ELEMENT', 'ELEMENT_JUCE', 'LUA' ],
         cflags      = ['-fvisibility=hidden' ],
         cxxflags    = ['-fvisibility=hidden' ],
         linkflags   = ['-fvisibility=hidden' ],
-        defines     = [ 'JUCE_DLL_BUILD=1', 'EL_JUCE_MAIN=1', 'EL_PRO=1' ]
+        defines     = ['EL_PRO=1']
     )
-
+    bld (
+        features='subst',
+        source ='UI/manifest.lua',
+        target = 'modules/UI.element/manifest.lua',
+    )
     app.includes.append ('libs/lua')
     app.includes.append ('libs/lua-kv/src')
     app.includes.append ('libs/lua-kv/include')
@@ -549,19 +558,19 @@ def build_juce_app (bld):
     if bld.host_is_linux():
         build_desktop (bld)
 
-    elif bld.host_is_mac():
-        app.target       = 'Applications/Element'
-        app.mac_app      = True
-        app.mac_plist    = 'build/data/Info.plist'
-        app.mac_files    = [ 'data/Icon.icns' ]
-        add_scripts_to (bld, '%s.app/Contents/Resources' % app.target, None)
+    # elif bld.host_is_mac():
+    #     app.target       = 'Applications/Element'
+    #     app.mac_app      = True
+    #     app.mac_plist    = 'build/data/Info.plist'
+    #     app.mac_files    = [ 'data/Icon.icns' ]
+    #     add_scripts_to (bld, '%s.app/Contents/Resources' % app.target, None)
 
-    elif bld.host_is_mingw32():
-        # app.env.append_unique ('LINKFLAGS_STATIC_GCC', [ '-static-libgcc', '-static-libstdc++',
-        #                                                  '-Wl,-Bstatic,--whole-archive', '-lwinpthread', 
-        #                                                  '-Wl,--no-whole-archive' ])
-        # app.use += [ 'STATIC_GCC' ]
-        app.install_path = bld.env.BINDIR
+    # elif bld.host_is_mingw32():
+    #     # app.env.append_unique ('LINKFLAGS_STATIC_GCC', [ '-static-libgcc', '-static-libstdc++',
+    #     #                                                  '-Wl,-Bstatic,--whole-archive', '-lwinpthread', 
+    #     #                                                  '-Wl,--no-whole-archive' ])
+    #     # app.use += [ 'STATIC_GCC' ]
+    #     app.install_path = bld.env.BINDIR
 
 def install_lua_files (bld):
     if not bld.host_is_linux() and not bld.host_is_mingw32():
@@ -611,25 +620,21 @@ def build (bld):
 
     build_liblua (bld)
     build_libelement (bld)
-    install_lua_files (bld)
-
-    # build_libjuce (bld)
     build_libelement_juce (bld)
-    build_console_app (bld)
     bld.add_group()
     build_juce_app (bld)
-    # bld.add_group()
-    return
+    bld.add_group()
+    build_console_app (bld)
 
-    modstobuild = 'jack JLV2'.split()
+    install_lua_files (bld)
+
+    modstobuild = 'JLV2'.split()
     for mod in modstobuild:
         bld.recurse ('modules/%s.element' % mod)
     
     # build_vst (bld)
     # build_vst3 (bld)
 
-    if bld.env.LUA and bool (bld.env.LIB_READLINE):
-        bld.recurse ('tools/lua-el')
     if bld.env.TEST:
         bld.recurse ('test')
 

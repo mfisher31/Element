@@ -232,7 +232,7 @@ struct LuaNode::Context
 
                 if (ok)
                 {
-                    audioBuffer = element::lua::new_userdata<AudioBuffer<float>> (state, LKV_MT_AUDIO_BUFFER_32);
+                    audioBuffer = element::lua::new_userdata<AudioBuffer<float>> (state, EL_MT_AUDIO_BUFFER_32);
                     audioBufRef = luaL_ref (state, LUA_REGISTRYINDEX);
                     ok = audioBufRef != LUA_REFNIL && audioBufRef != LUA_NOREF;
                 }

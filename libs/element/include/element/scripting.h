@@ -25,10 +25,6 @@
 extern "C" {
 #endif
 
-typedef struct elScriptingInterface {
-    void (*dummy)();
-} elScriptingInterface;
-
 #ifndef __cplusplus
 }
 #endif

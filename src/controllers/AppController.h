@@ -100,6 +100,11 @@ public:
     
     void checkForegroundStatus();
     
+    void run();
+    
+    void quit() { quitFlag.store (1); }
+    bool shouldQuit() const noexcept { return quitFlag.load() > 0; };
+    void resetQuitFlag() { quitFlag.store (0); }
 protected:
     friend class ApplicationCommandTarget;
     ApplicationCommandTarget* getNextCommandTarget() override;
@@ -118,7 +123,8 @@ private:
     RecentlyOpenedFilesList recentFiles;
     UndoManager undo;
     RunMode runMode;
-    void run();
+    std::atomic<int> quitFlag { 0 };
+    
 };
 
 }

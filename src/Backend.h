@@ -6,13 +6,15 @@
 #include <element/context.hpp>
 
 namespace Element {
+
 class AppController;
 class Globals;
 class Startup;
 
-class JuceBackend : public element::Backend {
+class JuceBackend {
 public:
-    JuceBackend (juce::ActionListener* listener);
+    JuceBackend() = delete;
+    explicit JuceBackend (juce::ActionListener* listener = nullptr);
     ~JuceBackend();
     void initialize();
     Globals& globals();

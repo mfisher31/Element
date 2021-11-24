@@ -28,6 +28,9 @@
 #include "session/PluginManager.h"
 
 namespace Element {
+
+extern void initializeWorld (Globals&);
+
 Application::Application() {}
 Application::~Application() {}
 
@@ -37,7 +40,7 @@ bool Application::moreThanOneInstanceAllowed() { return true; }
 
 void Application::initialise (const String& commandLine)
 {
-    backend = std::make_unique<JuceBackend> (this);
+    world.reset (new Globals());
     if (maybeLaunchSlave (commandLine))
         return;
 
@@ -52,25 +55,18 @@ void Application::initialise (const String& commandLine)
     launchApplication();
 }
 
-void Application::actionListenerCallback (const String& message)
-{
-    if (message == "finishedLaunching")
-        finishLaunching();
-}
-
 void Application::shutdown()
 {
-    if (! backend || ! controller)
+    if (! world || ! controller)
         return;
 
     slaves.clearQuick (true);
 
     {
-        auto& world = backend->globals();
-        auto engine (world.getAudioEngine());
-        auto& plugins (world.getPluginManager());
-        auto& settings (world.getSettings());
-        auto& midi (world.getMidiEngine());
+        auto engine (world->getAudioEngine());
+        auto& plugins (world->getPluginManager());
+        auto& settings (world->getSettings());
+        auto& midi (world->getMidiEngine());
         auto* props = settings.getUserSettings();
         plugins.setPropertiesFile (nullptr); // must be done before Settings is deleted
 
@@ -80,18 +76,18 @@ void Application::shutdown()
         plugins.saveUserPlugins (settings);
         midi.writeSettings (settings);
 
-        if (auto el = world.getDeviceManager().createStateXml())
+        if (auto el = world->getDeviceManager().createStateXml())
             props->setValue ("devices", el.get());
-        if (auto keymappings = world.getCommandManager().getKeyMappings()->createXml (true))
+        if (auto keymappings = world->getCommandManager().getKeyMappings()->createXml (true))
             props->setValue ("keymappings", keymappings.get());
 
         engine = nullptr;
         controller = nullptr;
         Logger::setCurrentLogger (nullptr);
-        world.setEngine (nullptr);
+        world->setEngine (nullptr);
     };
 
-    backend.reset();
+    world.reset();
 }
 
 void Application::systemRequestedQuit()
@@ -104,8 +100,7 @@ void Application::systemRequestedQuit()
 
 #if defined(EL_PRO)
     auto* sc = controller->findChild<SessionController>();
-    auto& world = backend->globals();
-    if (world.getSettings().askToSaveSession())
+    if (world->getSettings().askToSaveSession())
     {
         // - 0 if the third button was pressed ('cancel')
         // - 1 if the first button was pressed ('yes')
@@ -200,12 +195,11 @@ void Application::resumed()
 
 void Application::finishLaunching()
 {
-    if (nullptr != controller || backend->has_launched())
+    if (controller)
         return;
-    controller.reset (new AppController (backend->globals()));
-    auto& world = backend->globals();
-    if (world.getSettings().scanForPluginsOnStartup())
-        world.getPluginManager().scanAudioPlugins();
+    controller.reset (new AppController (*world));
+    if (world->getSettings().scanForPluginsOnStartup())
+        world->getPluginManager().scanAudioPlugins();
 
     auto modsdir = File::getCurrentWorkingDirectory().getChildFile ("build/modules");
 
@@ -214,7 +208,7 @@ void Application::finishLaunching()
 #if EL_PRO
     if (auto* sc = controller->findChild<SessionController>())
     {
-        const auto path = world.cli.commandLine.unquoted().trim();
+        const auto path = world->cli.commandLine.unquoted().trim();
         if (File::isAbsolutePath (path))
         {
             const File file (path);
@@ -236,7 +230,6 @@ void Application::printCopyNotice()
 
 bool Application::maybeLaunchSlave (const String& commandLine)
 {
-    auto* world = &backend->globals();
     slaves.clearQuick (true);
     slaves.add (world->getPluginManager().createAudioPluginScannerSlave());
     StringArray processIds = { EL_PLUGIN_SCANNER_PROCESS_ID };
@@ -260,11 +253,14 @@ bool Application::maybeLaunchSlave (const String& commandLine)
 
 void Application::launchApplication()
 {
-    if (backend->has_launched())
-        return;
-    backend->initialize();
+    Element::initializeWorld (*world);
+    triggerAsyncUpdate();
 }
 
 void Application::initializeModulePath() {}
+
+void Application::handleAsyncUpdate() {
+    finishLaunching();
+}
 
 } // namespace Element

@@ -4,11 +4,17 @@ import plugins
 bld (
     features        = 'cxx cxxshlib',
     includes        = [ '../../libs/jlv2/modules' ],
-    source          = [ 'jlv2plugin.cpp' ],
+    source          = [ 'jlv2.cpp' ],
     name            = 'JLV2_element',
     target          = 'JLV2',
     use             = [ 'ELEMENT_JUCE', 'LILV', 'SUIL', 'LV2' ],
     cxxflags        = [ '-fvisibility=hidden' ],
     env             = plugins.derive_env (bld),
-    defines         = [ 'JUCE_DLL_BUILD=1' ]
+    defines         = []
+)
+
+bld (
+    features='subst',
+    source='manifest.lua',
+    target='manifest.lua'
 )

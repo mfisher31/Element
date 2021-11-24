@@ -1,0 +1,14 @@
+console = bld.program (
+    source      = [ 'interpreter.cpp', 'main.cpp' ],
+    includes    = [ '.' ],
+    target      = '../bin/element',
+    name        = 'Element',
+    env         = bld.env.derive(),
+    use         = [ 'ELEMENT', 'LUA' ],
+    linkflags   = [],
+    defines     = []
+)
+
+if isinstance(bld.env.LIB_READLINE, list) and len(bld.env.LIB_READLINE) > 0:
+    console.use.append ('READLINE')
+    console.defines.append ('LUA_USE_READLINE=1')

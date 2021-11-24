@@ -9,7 +9,7 @@
 #include "juce_helpers.hpp"
 #include "bytes.h"
 #include "packed.h"
-#define LKV_MT_MIDI_BUFFER_TYPE "el.MidiBufferClass"
+#define EL_MT_MIDI_BUFFER_TYPE "el.MidiBufferClass"
 
 using MidiBuffer    = juce::MidiBuffer;
 using Iterator      = juce::MidiBufferIterator;
@@ -184,7 +184,7 @@ static int midibuffer_addbuffer (lua_State* L) {
 
 static int midibuffer_insertbytes (lua_State* L) {
     auto* impl = *(Impl**) lua_touserdata (L, 1);
-    auto* b = (kv_bytes_t*) lua_touserdata (L, 2);
+    auto* b = (elBytes*) lua_touserdata (L, 2);
     auto  n = static_cast<int> (lua_tointeger (L, 3));
     auto  f = static_cast<int> (lua_tointeger (L, 4)) - 1;
     impl->buffer.addEvent (b->data, n, f);
@@ -305,19 +305,19 @@ extern "C" {
 
 EL_API
 int luaopen_el_MidiBuffer (lua_State* L) {
-    if (luaL_newmetatable (L, LKV_MT_MIDI_BUFFER)) {
+    if (luaL_newmetatable (L, EL_MT_MIDI_BUFFER)) {
         lua_pushvalue (L, -1);               /* duplicate the metatable */
         lua_setfield (L, -2, "__index");     /* mt.__index = mt */
         luaL_setfuncs (L, buffer_methods, 0);
         lua_pop (L, 1);
     }
 
-    if (luaL_newmetatable (L, LKV_MT_MIDI_BUFFER_TYPE)) {
+    if (luaL_newmetatable (L, EL_MT_MIDI_BUFFER_TYPE)) {
         lua_pop (L, 1);
     }
 
     lua_newtable (L);
-    luaL_setmetatable (L, LKV_MT_MIDI_BUFFER_TYPE);
+    luaL_setmetatable (L, EL_MT_MIDI_BUFFER_TYPE);
     lua_pushcfunction (L, midibuffer_new);
     lua_setfield (L, -2, "new");
     return 1;

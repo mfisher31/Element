@@ -33,6 +33,7 @@ def check_liblua (self):
         self.check_cfg (package='luajit >= 2.1', uselib_store="LUA", 
                         args='--cflags --libs', mandatory=False)
         self.env.LUAJIT = bool (self.env.HAVE_LUA)
+        self.define ('HAVE_LUAJIT', True)
     
     if not bool(self.env.LUAJIT):
         self.env.LUAJIT = False

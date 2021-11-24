@@ -19,7 +19,7 @@ struct MidiBufferImpl final {
     MidiBufferImpl (lua_State* L) {
         message = (juce::MidiMessage**) lua_newuserdata (L, sizeof (juce::MidiMessage**));
         *message = new juce::MidiMessage();
-        luaL_setmetatable (L, LKV_MT_MIDI_MESSAGE);
+        luaL_setmetatable (L, EL_MT_MIDI_MESSAGE);
         msgref = luaL_ref (L, LUA_REGISTRYINDEX);
     }
     ~MidiBufferImpl() = default;
@@ -50,7 +50,7 @@ MidiBufferImpl**
 new_midibuffer (lua_State* L) {
     auto** impl = (MidiBufferImpl**) lua_newuserdata (L, sizeof (MidiBufferImpl**));
     *impl = new MidiBufferImpl (L);
-    luaL_setmetatable (L, LKV_MT_MIDI_BUFFER);
+    luaL_setmetatable (L, EL_MT_MIDI_BUFFER);
     return impl;
 }
 

@@ -20,7 +20,7 @@ static void el_jack_destroy(elHandle handle)
     printf("JACK destroyed\n");
 }
 
-const elDescriptor* eds_descriptor()
+const elDescriptor* element_descriptor()
 {
     static const struct elDescriptor D = {
         .create = el_jack_create,

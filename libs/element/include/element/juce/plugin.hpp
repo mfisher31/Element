@@ -1,76 +1,30 @@
+/** 
+    This file is part of Element
+    Copyright (C) 2016-2021  Kushview, LLC.  All rights reserved.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+**/
 
 #include <element/juce.hpp>
 #include <element/plugin.h>
 
-extern "C" {
-/** JUCE audio plugin host support.
- * 
- *  Provides an interface for dealing with juce objects directly.
- */
-typedef struct elJuceRegistrar {
-    /** Opaque handle to host data. */
-    void* handle;
-    bool (*register_audio_plugin_format)(void* handle, void* format);
-} elJuceRegistrar;
-}
+#define EL_JUCE__AudioPluginFormat "juce.AudioPluginFormat"
 
-#define EL_FEATURE__JuceRegistrar EL_PREFIX "JuceRegistrar"
-
-namespace element {
-
-struct JuceRegistrar {
-    JuceRegistrar() = default;
-    ~JuceRegistrar() = default;
-    constexpr static size_t data_size() noexcept
-    {
-        return sizeof(elJuceRegistrar);
-    }
-    JuceRegistrar(const elFeature& e) { memcpy(&ext, e.data, data_size()); }
-    JuceRegistrar(const elJuceRegistrar& j) { memcpy(&ext, &j, data_size()); }
-
-    inline bool register_format(juce::AudioPluginFormat* format)
-    {
-        return valid() ? ext.register_audio_plugin_format(ext.handle, (void*)format)
-                       : false;
-    }
-
-    constexpr bool valid() const noexcept
-    {
-        return ext.handle != nullptr && ext.register_audio_plugin_format != nullptr;
-    }
-    inline operator bool() const noexcept { return valid(); }
-
-private:
-    elJuceRegistrar ext;
-};
-
-template<class APF, typename... Args>
-static bool register_juce_audio_plugin_format(elFeatures features,
-                                              Args&&... args)
-{
-    if (NULL == features)
-        return false;
-
-    for (auto* e = *features; e != nullptr; e++) {
-        if (strcmp(e->ID, EL_FEATURE__JuceRegistrar) == 0) {
-            std::unique_ptr<APF> ptr;
-            JuceRegistrar je (*e);
-            if (sizeof...(args) > 0)
-                ptr.reset(new APF(std::forward<Args>(args)...));
-            else
-                ptr.reset(new APF());
-
-            if (auto* fmt = dynamic_cast<juce::AudioPluginFormat*>(ptr.get()))
-                if (je.register_format(fmt)) {
-                    ptr.release();
-                    return true;
-                }
-
-            break;
-        }
-    }
-
-    return false;
-}
-
-}
+/** This is the data type returned for the juce.AudioPluginFormat extension */
+typedef struct {
+    /** Handle to internal data */
+    elHandle handle;
+    /** Factory function. */
+    juce::AudioPluginFormat* (*create)(elHandle handle);
+} elJuceAudioPluginFormat;

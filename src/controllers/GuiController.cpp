@@ -352,6 +352,7 @@ void GuiController::run()
     mainWindow->restoreWindowStateFromString (pf->getValue ("mainWindowState"));
     mainWindow->addKeyListener (keys.get());
     mainWindow->addKeyListener (commander().getKeyMappings());
+    std::clog << __PRETTY_FUNCTION__ << std::endl;
     getContentComponent()->restoreState (pf);
 
     {
@@ -836,9 +837,12 @@ bool GuiController::perform (const InvocationInfo& info)
             }
         } break;
 
-        case Commands::quit:
-            JUCEApplication::getInstance()->systemRequestedQuit();
-            break;
+        case Commands::quit: {
+            if (auto* app = JUCEApplication::getInstance())
+                app->systemRequestedQuit();
+            else
+                getAppController().quit();
+        } break;
         
         default:
             result = false;

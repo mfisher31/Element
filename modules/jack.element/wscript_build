@@ -10,3 +10,9 @@ jack = bld (
     cflags          = [ '-fvisibility=hidden' ],
     env             = plugins.derive_env (bld)
 )
+
+bld (
+    features='subst',
+    source='manifest.lua',
+    target='manifest.lua'
+)
