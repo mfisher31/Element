@@ -115,13 +115,9 @@
                 "${workspaceRoot}/libs/kv/include/*",
                 "${workspaceRoot}/libs/jlv2/modules/*",
                 "${workspaceRoot}/libs/compat/*",
-                "${workspaceRoot}/libs/lua/*",
-                "${workspaceRoot}/libs/lua/src/*",
                 "${workspaceRoot}/libs/element/include/*",
                 "${workspaceRoot}/src/*",
-                "${workspaceRoot}/test/*",
-                "${workspaceRoot}/libs/lua-kv/*",
-                "${workspaceRoot}/libs/lua-kv/src/*"
+                "${workspaceRoot}/test/*"
             ],
             "defines": [
                 "EL_LUADIR=\"/usr/share/element/lua\"",
