@@ -9,8 +9,11 @@
 
 #include "dynlib.h"
 #include "element/context.hpp"
+#include "element/graphics.h"
 #include "element/plugin.h"
 #include "scripting.hpp"
+#include "video.hpp"
+
 #include <sol/sol.hpp>
 
 #include "manifest.hpp"
@@ -19,9 +22,10 @@
 namespace element {
 
 using FeatureMap = std::map<std::string, const void*>;
-static FeatureMap map_features (elFeatures features) {
+static FeatureMap map_features (elFeatures features)
+{
     FeatureMap fm;
-    EL_FEATURES_FOREACH(features,f)
+    EL_FEATURES_FOREACH (features, f)
         fm.insert ({ f->ID, f->data });
     return std::move (fm);
 }
@@ -66,6 +70,11 @@ public:
         return library != nullptr && mod != nullptr && handle != nullptr;
     }
 
+    const void* extension (const std::string& ID) const noexcept {
+        return mod && handle && mod->extension ? mod->extension (handle, ID.c_str())
+            : nullptr;
+    }
+
     bool open()
     {
         close();
@@ -101,8 +110,8 @@ public:
             if (handle && mod->extension) {
                 std::vector<std::string> mids;
                 mids.push_back (EL_EXTENSION__Main);
-                mids.push_back ("juce.AudioPluginFormat");
                 mids.push_back (EL_EXTENSION__LuaPackages);
+                mids.push_back ("el.GraphicsDevice");
                 for (auto& s : mids) {
                     if (auto data = mod->extension (handle, s.c_str())) {
                         elFeature feature = {
@@ -122,13 +131,13 @@ public:
     {
         bool handled = true;
         if (strcmp (f.ID, EL_EXTENSION__LuaPackages) == 0) {
-            for (auto reg = (const luaL_Reg*) f.data; reg != nullptr; ++reg) {
-                if (reg->name == nullptr || reg->func == nullptr)
-                    break;
+            for (auto reg = (const luaL_Reg*) f.data; reg != nullptr && reg->name != nullptr && reg->func != nullptr; ++reg) {
                 scripting.add_package (reg->name, reg->func);
             }
         } else if (strcmp (f.ID, EL_EXTENSION__Main) == 0) {
             main = (const elMain*) f.data;
+        } else if (strcmp (f.ID, "el.GraphicsDevice") == 0) {
+            backend.video->load_device_descriptor ((const egDeviceDescriptor*) f.data);
         } else {
             handled = false;
             for (const auto& ex : manifest.provides) {
@@ -158,9 +167,9 @@ public:
 
     void unload()
     {
-        if (!has_loaded)
+        if (! has_loaded)
             return;
-        
+
         has_loaded = false;
         if (handle && mod && mod->unload) {
             mod->unload (handle);
@@ -178,11 +187,14 @@ public:
 
     void close()
     {
+        unload();
+
         if (handle != nullptr) {
-            if (mod != nullptr && mod->unload != nullptr)
-                mod->unload (handle);
+            if (mod != nullptr && mod->destroy != nullptr)
+                mod->destroy (handle);
             handle = nullptr;
         }
+
         mod = nullptr;
         main = nullptr;
         moduleFunction = nullptr;
@@ -221,13 +233,6 @@ public:
     using vector_type = std::vector<ptr_type>;
     Modules (Context& c) : backend (c) {}
 
-    void clear()
-    {
-        for (auto& m : mods)
-            m->close();
-        mods.clear();
-    }
-
     void add (ptr_type mod)
     {
         mods.push_back (std::move (mod));
@@ -247,10 +252,11 @@ public:
         return result != mods.end();
     }
 
-    int discover() {
+    int discover()
+    {
         if (discovered.size() > 0)
             return (int) discovered.size();
-        
+
         for (auto const& entry : searchpath.find_folders (false, "*.element")) {
             Manifest manifest = read_module_manifest (entry.string());
             if (! manifest.name.empty())
@@ -258,6 +264,13 @@ public:
         }
 
         return (int) discovered.size();
+    }
+
+    void unload_all() {
+        for (const auto& mod : mods) {
+            mod->unload();
+            mod->close();
+        }
     }
 
 private:
@@ -272,12 +285,17 @@ Context::Context()
 {
     modules.reset (new Modules (*this));
     scripting.reset (new Scripting());
+    video.reset (new Video());
+    video->start_thread();
 }
 
 Context::~Context()
 {
-    modules.reset();
+    video->stop_thread();
     scripting.reset();
+    video.reset();
+    modules->unload_all();
+    modules.reset();   
 }
 
 void Context::test_open_module (const std::string& ID)
@@ -346,13 +364,49 @@ int Context::test_main (const std::string module_id, int argc, const char* argv[
     return -1;
 }
 
-void Context::test_add_module_search_path (const std::string& path) {
+void Context::test_add_module_search_path (const std::string& path)
+{
     auto& sp = modules->searchpath;
     sp.add (path);
 }
 
-void Context::test_discover_modules() {
+void Context::test_discover_modules()
+{
     modules->discover();
 }
 
 } // namespace element
+
+struct elContext {
+    elContext()
+        : impl (new element::Context(), delete_ptr) {}
+
+    elContext (element::Context* ctx)
+        : impl (ctx, release_ptr) {}
+
+    ~elContext()
+    {
+        impl.reset();
+    }
+
+    bool object_is_owned() const noexcept { return impl.get_deleter() == delete_ptr; }
+    element::Context& object() noexcept { return *impl; }
+
+private:
+    using Deleter = void (*) (element::Context*);
+    using Pointer = std::unique_ptr<element::Context, Deleter>;
+    Pointer impl;
+    static void release_ptr (element::Context*) {}
+    static void delete_ptr (element::Context* obj) { delete obj; }
+};
+
+elContext* element_context_new()
+{
+    return new elContext();
+}
+
+void element_context_free (elContext* ctx)
+{
+    auto& obj = ctx->object();
+    delete ctx;
+}

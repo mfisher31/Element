@@ -189,6 +189,9 @@ def element_sources (ctx):
         libs/element/src/context.cpp
         libs/element/src/scripting.cpp
         libs/element/src/strings.cpp
+        libs/element/src/video.cpp
+        libs/element/src/graphics_context.cpp
+        libs/element/include/element/source.cpp
         '''.split()
     if ctx.host_is_windows():
         lib_sources.append ('libs/element/src/dlfcn-win32.c')
@@ -422,11 +425,15 @@ def build_libelement (bld):
         install_path  = os.path.join (library.install_path, 'pkgconfig')
     )
 
-    if bld.host_is_linux() and not bld.env.LUA:
+    if bld.host_is_linux():
         library.use.append ('DL')
+        library.use.append ('PTHREAD')
     
     library.export_includes = library.includes
     bld.add_group()
+
+def build_libelement_opengl (bld):
+    bld.recurse ('libs/element/opengl')
 
 def build_libelement_juce (bld):
     env = bld.env.derive()
@@ -621,6 +628,7 @@ def build (bld):
     build_liblua (bld)
     build_libelement (bld)
     build_libelement_juce (bld)
+    build_libelement_opengl (bld)
     bld.add_group()
     build_juce_app (bld)
     bld.add_group()

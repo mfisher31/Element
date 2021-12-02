@@ -1,6 +1,8 @@
 #ifndef EL_PLUGIN_H
 #define EL_PLUGIN_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

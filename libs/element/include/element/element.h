@@ -23,7 +23,7 @@ extern "C" {
     #define EL_EXPORT EL_EXTERN EL_API
 #else
     // *nix exports
-    #define EL_API __attribute__ ((visibility ("default")))
+    #define EL_API    __attribute__ ((visibility ("default")))
     #define EL_EXPORT EL_EXTERN EL_API
 #endif
 
@@ -32,25 +32,47 @@ extern "C" {
     #define EL_EXPORT
 #endif
 
-#define EL_MT_AUDIO_BUFFER_64              "el.AudioBuffer64"
-#define EL_MT_AUDIO_BUFFER_32              "el.AudioBuffer32"
-#define EL_MT_BYTE_ARRAY                   "el.ByteArray"
-#define EL_MT_MIDI_MESSAGE                 "el.MidiMessage"
-#define EL_MT_MIDI_BUFFER                  "el.MidiBuffer"
-#define EL_MT_MIDI_PIPE                    "el.MidiPipe"
-#define EL_MT_VECTOR                       "el.Vector"
+//=============================================================================
+typedef enum {
+    EL_PORT_TYPE_AUDIO,
+    EL_PORT_TYPE_CV,
+    EL_PORT_TYPE_ATOM,
+    EL_PORT_TYPE_MIDI,
+    EL_PORT_TYPE_VIDEO,
+    EL_PORT_TYPE_UNKNOWN
+} elPortType;
 
+//=============================================================================
+#define EL_MT_AUDIO_BUFFER_64 "el.AudioBuffer64"
+#define EL_MT_AUDIO_BUFFER_32 "el.AudioBuffer32"
+#define EL_MT_BYTE_ARRAY      "el.ByteArray"
+#define EL_MT_MIDI_MESSAGE    "el.MidiMessage"
+#define EL_MT_MIDI_BUFFER     "el.MidiBuffer"
+#define EL_MT_MIDI_PIPE       "el.MidiPipe"
+#define EL_MT_VECTOR          "el.Vector"
+
+//=============================================================================
+struct elContext;
+struct elGraphics;
+struct elVideo;
+
+typedef struct elContext elContext;
+typedef struct elGraphics elGraphics;
+typedef struct elVideo elVideo;
+
+EL_EXPORT elContext* element_context_new();
+EL_EXPORT void element_context_free (elContext* ctx);
+EL_EXPORT elVideo* element_video (elContext* ctx);
 
 #ifdef __cplusplus
-
-#define EL_DISABLE_COPY(ClassName)        \
-    ClassName(const ClassName&) = delete; \
-    ClassName& operator=(const ClassName&) = delete;
-#define EL_DISABLE_MOVE(ClassName)         \
-    ClassName(const ClassName&&) = delete; \
-    ClassName& operator=(const ClassName&&) = delete;
-
 } // extern "C"
-#endif
 
+    #define EL_DISABLE_COPY(ClassName)         \
+        ClassName (const ClassName&) = delete; \
+        ClassName& operator= (const ClassName&) = delete;
+    #define EL_DISABLE_MOVE(ClassName)          \
+        ClassName (const ClassName&&) = delete; \
+        ClassName& operator= (const ClassName&&) = delete;
+
+#endif
 #endif

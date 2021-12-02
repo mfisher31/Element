@@ -1,0 +1,36 @@
+import plugins
+
+opengl = bld (
+    features = 'cxx cxxshlib',
+    source = '''
+        opengl.cpp
+        texture2d.cpp
+    '''.split(),
+    includes = [ '.', '../include', 'glad/include' ],
+    name = 'ELEMENT_OPENGL',
+    target = '../../../modules/OpenGL.element/OpenGL',
+    cppflags = ['-fPIC' ],
+    linkflags = [],
+    env = plugins.derive_env (bld),
+    use = []
+)
+
+opengl.env.append_unique ('CFLAGS', ['-fvisibility=hidden'])
+opengl.env.append_unique ('CXXFLAGS', ['-fvisibility=hidden'])
+opengl.env.append_unique ('LINKFLAGS', ['-fvisibility=hidden'])
+
+if bld.host_is_linux():
+    opengl.source.append ('x11_glx.cpp')
+    # opengl.source.append ('glad/src/glad_glx.c')
+    opengl.use.append ('X11')
+    opengl.linkflags.append ('-lX11-xcb')
+elif bld.host_is_windows():
+    opengl.source.append ('windows.c')
+elif bld.host_is_mac():
+    opengl.source.append ('mac.m')
+
+bld (
+    features='subst',
+    source='manifest.lua',
+    target='../../../modules/OpenGL.element/manifest.lua'
+)

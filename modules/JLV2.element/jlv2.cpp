@@ -23,6 +23,8 @@
 struct JLV2 final {
     JLV2()
     {
+        // std::clog << "Jnewline" << juce::newLine << std::endl;
+        juce::String hither ("hi");
         memset (&format, 0, sizeof (elJuceAudioPluginFormat));
         format.handle = this;
         format.create = &JLV2::create_format;

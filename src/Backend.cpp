@@ -141,4 +141,30 @@ void initializeWorld (Globals& g)
     return;
 }
 
+void shutdownWorld (Globals& g, AppController& a) {
+    auto* const world = &g;
+    auto* const controller = &a;
+
+    auto engine (world->getAudioEngine());
+    auto& plugins (world->getPluginManager());
+    auto& settings (world->getSettings());
+    auto& midi (world->getMidiEngine());
+    auto* props = settings.getUserSettings();
+    plugins.setPropertiesFile (nullptr); // must be done before Settings is deleted
+
+    controller->saveSettings();
+    controller->deactivate();
+
+    plugins.saveUserPlugins (settings);
+    midi.writeSettings (settings);
+
+    if (auto el = world->getDeviceManager().createStateXml())
+        props->setValue ("devices", el.get());
+    if (auto keymappings = world->getCommandManager().getKeyMappings()->createXml (true))
+        props->setValue ("keymappings", keymappings.get());
+
+    Logger::setCurrentLogger (nullptr);
+    world->setEngine (nullptr);
+}
+
 } // namespace Element

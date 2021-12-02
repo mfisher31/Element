@@ -16,6 +16,7 @@ extern int luaopen_el_Rectangle (lua_State*);
 
 namespace Element {
     extern void initializeWorld (Globals&);
+    extern void shutdownWorld (Globals&, AppController&);
 }
 
 struct UI final {
@@ -41,6 +42,8 @@ struct UI final {
     }
 
     Element::Globals& getWorld() { return *world; }
+    Element::AppController& getApp() { return *controller; }
+
     std::unique_ptr<Element::Application> app;
     std::unique_ptr<Element::Globals> world;
     std::unique_ptr<Element::AppController> controller;
@@ -74,7 +77,10 @@ static void ui_load (elHandle handle, elFeatures features)
 
 static void ui_unload (elHandle handle)
 {
-    (void)handle;
+    std::clog << __PRETTY_FUNCTION__ << std::endl;
+    auto ui = (UI*) handle;
+    ui->controller.reset();
+    ui->world.reset();
 }
 
 static void ui_destroy (elHandle handle)
@@ -111,7 +117,7 @@ static int ui_main (elHandle handle, int argc, const char* argv[])
             std::clog << "event loop finished\n";
         }
         JUCE_CATCH_EXCEPTION
-        ui->controller->deactivate();
+        Element::shutdownWorld (ui->getWorld(), ui->getApp());
         ui->controller->resetQuitFlag();
         return 0;
 
