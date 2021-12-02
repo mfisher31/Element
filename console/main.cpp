@@ -53,6 +53,9 @@ int run_console (int ac, const char* av[])
         return backend->test_main (name, 1, args.data());
     };
 
+    view["quit"] = [&view]() {
+        view["quitflag"] = true;
+    };
     return element_console_main (view, ac, av);
 }
 
@@ -71,8 +74,12 @@ int main (int ac, char* av[])
     for (int i = 0; i < ac; ++i)
         cli.push_back (av[i]);
 
-    return console ? run_console (cli.size(), cli.data())
-                   : run_ui (cli.size(), cli.data());
+    int result = console ? run_console (cli.size(), cli.data())
+                         : run_ui (cli.size(), cli.data());
+
+    std::clog << "[info] release backend\n";
+    backend.reset();
+    return result;
 }
 
 #if _WIN32

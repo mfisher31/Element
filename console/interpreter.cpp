@@ -623,8 +623,12 @@ static void doREPL (lua_State* L)
     {
         if (status == LUA_OK)
             status = docall (L, 0, LUA_MULTRET);
-        if (status == LUA_OK)
+        if (status == LUA_OK) {
             l_print (L);
+            sol::state_view view (L);
+            if (view.get_or ("quitflag", false))
+                break;
+        }
         else
             report (L, status);
     }
