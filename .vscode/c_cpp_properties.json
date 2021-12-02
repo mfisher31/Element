@@ -117,7 +117,8 @@
                 "${workspaceRoot}/libs/compat/*",
                 "${workspaceRoot}/libs/element/include/*",
                 "${workspaceRoot}/src/*",
-                "${workspaceRoot}/test/*"
+                "${workspaceRoot}/test/*",
+                "${workspaceRoot}/libs/element/opengl/glad/include/*"
             ],
             "defines": [
                 "EL_LUADIR=\"/usr/share/element/lua\"",
