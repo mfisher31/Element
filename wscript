@@ -408,11 +408,11 @@ def build_libelement (bld):
         cflags      = [ '-fvisibility=hidden' ],
         cxxflags    = [ '-fvisibility=hidden' ],
         defines     = [ 'EL_PRO=1', 'EL_DLLEXPORT=1' ],
-        linkflags   = [ '-Wl,--no-as-needed' ],
+        linkflags   = [],
         vnum        = '0.47.0',
         install_path = bld.env.LIBDIR
     )
-    
+
     bld (
         features      = 'subst',
         source        = 'element.pc.in',
@@ -626,9 +626,10 @@ def build (bld):
         return
 
     build_liblua (bld)
+    build_libelement_opengl (bld)
     build_libelement (bld)
     build_libelement_juce (bld)
-    build_libelement_opengl (bld)
+    
     bld.add_group()
     build_juce_app (bld)
     bld.add_group()
