@@ -233,14 +233,14 @@ typedef struct {
 typedef void* evgHandle;
 
 typedef struct {
-    evgHandle (*create)(evgHandle device, const evgSwapSetup* setup);
-    void (*destroy)(evgHandle swap);
+    evgHandle (*create) (evgHandle device, const evgSwapSetup* setup);
+    void (*destroy) (evgHandle swap);
 } evgSwapInterface;
 
 typedef struct {
-    evgHandle (*create)(evgHandle device);
-    void (*destroy)(evgHandle program);
-    void (*link)(evgHandle program, evgHandle verts, evgHandle frags);
+    evgHandle (*create) (evgHandle device);
+    void (*destroy) (evgHandle program);
+    void (*link) (evgHandle program, evgHandle verts, evgHandle frags);
 } evgProgramInterface;
 
 typedef struct {
@@ -249,16 +249,38 @@ typedef struct {
 } evgIndexArraySetup;
 
 typedef struct {
-    evgHandle (*create)(evgHandle device, uint32_t size, uint32_t flags);
+    evgHandle (*create) (evgHandle device, uint32_t size, uint32_t flags);
     void (*destroy) (evgHandle handle);
     void (*fill_setup) (evgHandle array, evgIndexArraySetup* setup);
-    void (*update)(evgHandle array, void* data);
+    void (*update) (evgHandle array, void* data);
 } evgIndexBufferInterface;
+
+typedef struct {
+    evgHandle (*create) (evgHandle device, evgShaderType type);
+    void (*destroy) (evgHandle handle);
+    bool (*parse) (evgHandle shader, const char* program);
+    void (*add_attribute) (evgHandle shader, const char* name, evgAttributeType type, uint32_t index);
+    void (*add_uniform) (evgHandle shader, evgValueType value_type);
+} evgShaderInterface;
+
+typedef struct {
+    evgHandle (*create) (evgHandle device, const evgTextureSetup* setup, const uint8_t** data);
+    void (*destroy) (evgHandle tex);
+    void (*fill_setup) (evgHandle tex, evgTextureSetup* setup);
+    void (*map) (evgHandle tex);
+} evgTextureInterface;
+
+typedef struct {
+    evgHandle (*create) (evgHandle device, evgVertexData* data, uint32_t flags);
+    void (*destroy) (evgHandle vbuf);
+    evgVertexData* (*data) (evgHandle vbuf);
+    void (*flush) (evgHandle vbuf);
+} evgVertexBufferInterface;
 
 //=============================================================================
 typedef struct {
     const char* name;
-    
+
     evgHandle (*create)();
     void (*destroy) (evgHandle device);
 
@@ -266,35 +288,22 @@ typedef struct {
     void (*leave_context) (evgHandle device);
     void (*clear_context) (evgHandle device);
 
-    void (*viewport)(evgHandle device, int x, int y, int width, int height);
-    void (*ortho)(evgHandle, float left, float right, float top, float bottom, float near, float far);
-    void (*draw)(evgHandle device, egDrawMode mode, uint32_t start, uint32_t nverts);
-    void (*present)(evgHandle device);
-    void (*flush)(evgHandle device);
+    void (*viewport) (evgHandle device, int x, int y, int width, int height);
+    void (*ortho) (evgHandle, float left, float right, float top, float bottom, float near, float far);
+    void (*draw) (evgHandle device, egDrawMode mode, uint32_t start, uint32_t nverts);
+    void (*present) (evgHandle device);
+    void (*flush) (evgHandle device);
 
     void (*load_index_buffer) (evgHandle device, evgHandle ibuf);
     void (*load_program) (evgHandle device, evgHandle program);
-    void (*load_shader)(evgHandle device, evgHandle shader);
+    void (*load_shader) (evgHandle device, evgHandle shader);
     void (*load_swap) (evgHandle device, evgHandle swap);
     void (*load_texture) (evgHandle device, evgHandle texture, int index);
     void (*load_vertex_buffer) (evgHandle device, evgHandle vbuf);
 
-    evgHandle (*texture_create) (evgHandle device, const evgTextureSetup* setup, const uint8_t** data);
-    void (*texture_destroy) (evgHandle tex);
-    void (*texture_fill_setup) (evgHandle tex, evgTextureSetup* setup);
-    void (*texture_map) (evgHandle tex);
-
-    evgHandle (*vertex_buffer_create) (evgHandle device, evgVertexData* data, uint32_t flags);
-    void (*vertex_buffer_destroy) (evgHandle vbuf);
-    evgVertexData* (*vertex_buffer_data) (evgHandle vbuf);
-    void (*vertex_buffer_flush) (evgHandle vbuf);
-
-    evgHandle (*shader_create)(evgHandle device, evgShaderType type);
-    void (*shader_destroy) (evgHandle shader);
-    bool (*shader_parse) (evgHandle shader, const char* program);
-    void (*shader_add_attribute) (evgHandle shader, evgAttributeType type, evgValueType value_type);
-    void (*shader_add_uniform) (evgHandle shader, evgValueType value_type);
-
+    const evgTextureInterface* texture;
+    const evgVertexBufferInterface* vertex_buffer;
+    const evgShaderInterface* shader;
     const evgSwapInterface* swap;
     const evgProgramInterface* program;
     const evgIndexBufferInterface* index_buffer;
@@ -319,19 +328,22 @@ inline static bool evg_descriptor_valid (const evgDescriptor* desc)
            desc->load_texture != NULL &&
            desc->load_vertex_buffer != NULL &&
            
-           desc->texture_create != NULL &&
-           desc->texture_destroy != NULL &&
-           desc->texture_fill_setup != NULL &&
+           desc->texture != NULL &&
+           desc->texture->create != NULL &&
+           desc->texture->destroy != NULL &&
+           desc->texture->fill_setup != NULL &&
         //    desc->texture_map != NULL &&
 
-           desc->vertex_buffer_create != NULL &&
-           desc->vertex_buffer_data != NULL &&
-           desc->vertex_buffer_destroy != NULL &&
-           desc->vertex_buffer_flush != NULL &&
+           desc->vertex_buffer != NULL &&
+           desc->vertex_buffer->create != NULL &&
+           desc->vertex_buffer->data != NULL &&
+           desc->vertex_buffer->destroy != NULL &&
+           desc->vertex_buffer->flush != NULL &&
 
-           desc->shader_create != NULL &&
-           desc->shader_destroy != NULL &&
-           desc->shader_parse != NULL &&
+           desc->shader != NULL &&
+           desc->shader->create != NULL &&
+           desc->shader->destroy != NULL &&
+           desc->shader->parse != NULL &&
 
            desc->program != NULL &&
            desc->program->create != NULL &&

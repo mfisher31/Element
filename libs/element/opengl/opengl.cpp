@@ -175,110 +175,6 @@ void Device::_flush (evgHandle dh)
 using namespace gl;
 
 //=============================================================================
-static evgHandle gl_texture_create (evgHandle dh, const evgTextureSetup* setup, const uint8_t** data)
-{
-    if (nullptr == dh)
-        return nullptr;
-
-    auto device = static_cast<Device*> (dh);
-    std::unique_ptr<Texture> tex;
-
-    switch (setup->type) {
-        case EVG_TEXTURE_2D:
-            tex = std::make_unique<Texture2D> (*device, *setup);
-            break;
-        case EVG_TEXTURE_3D:
-            // tex = std::make_unique<evgTexture3D> (*device, *setup);
-            break;
-        case EVG_TEXTURE_CUBE:
-            // tex = std::make_unique<evgTextureCube> (*device, *setup);
-            break;
-    }
-
-    if (tex == nullptr)
-        return nullptr;
-
-    tex->upload (data);
-    return tex->has_uploaded() ? tex.release() : nullptr;
-}
-
-static void gl_texture_destroy (evgHandle t)
-{
-    std::unique_ptr<Texture> tex ((Texture*) t);
-    if (tex == nullptr)
-        return;
-
-    switch (tex->type()) {
-        case EVG_TEXTURE_2D:
-            break;
-        case EVG_TEXTURE_3D:
-            break;
-        case EVG_TEXTURE_CUBE:
-            break;
-    }
-
-    tex.reset();
-}
-
-static void gl_texture_fill_setup (evgHandle tex, evgTextureSetup* setup)
-{
-    if (tex != nullptr && setup != nullptr)
-        ((Texture*) tex)->fill_setup (setup);
-}
-
-//=============================================================================
-static evgHandle gl_vertex_buffer_create (evgHandle device,
-                                          evgVertexData* data,
-                                          uint32_t flags)
-{
-    auto vbuf = std::make_unique<VertexBuffer> (data, flags);
-    if (! vbuf->create_buffers()) {
-        glog ("[opengl] failed to create vertex buffer");
-        return nullptr;
-    }
-    return vbuf.release();
-    return nullptr;
-}
-
-static void gl_vertex_buffer_destroy (evgHandle v)
-{
-    if (auto vbuf = static_cast<VertexBuffer*> (v)) {
-        vbuf->destroy_buffers();
-        delete vbuf;
-    }
-}
-
-static evgVertexData* gl_vertex_buffer_data (evgHandle v)
-{
-    auto vbuf = (VertexBuffer*) v;
-    return vbuf != nullptr ? vbuf->get_data() : nullptr;
-}
-
-static void gl_vertex_buffer_flush (evgHandle v)
-{
-    auto vbuf = (VertexBuffer*) v;
-    vbuf != nullptr ? vbuf->flush() : void();
-}
-
-//=============================================================================
-static evgHandle gl_shader_create (evgHandle dh, evgShaderType type)
-{
-    auto device = static_cast<Device*> (dh);
-    return new Shader (*device, type);
-}
-
-static bool gl_shader_parse (evgHandle sh, const char* text)
-{
-    return (static_cast<Shader*> (sh))->parse (text);
-}
-
-static void gl_shader_destroy (evgHandle sh)
-{
-    delete static_cast<Shader*> (sh);
-}
-
-//=============================================================================
-
 struct OpenGL {
     using Descriptor = evg::Descriptor<gl::Device>;
     Descriptor vgdesc;
@@ -299,24 +195,11 @@ struct OpenGL {
         vgdesc.load_texture = Device::_load_texture;
         vgdesc.load_vertex_buffer = Device::_load_vertex_buffer;
 
-        vgdesc.texture_create = gl_texture_create;
-        vgdesc.texture_destroy = gl_texture_destroy;
-        vgdesc.texture_fill_setup = gl_texture_fill_setup;
-        vgdesc.texture_map = nullptr;
-
-        vgdesc.vertex_buffer_create = gl_vertex_buffer_create;
-        vgdesc.vertex_buffer_destroy = gl_vertex_buffer_destroy;
-        vgdesc.vertex_buffer_data = gl_vertex_buffer_data;
-        vgdesc.vertex_buffer_flush = gl_vertex_buffer_flush;
-
-        vgdesc.shader_create = gl_shader_create;
-        vgdesc.shader_destroy = gl_shader_destroy;
-        vgdesc.shader_parse = gl_shader_parse;
-        vgdesc.shader_add_attribute = Shader::add_attribute;
-        vgdesc.shader_add_uniform = Shader::add_uniform;
-
-        vgdesc.program = Program::interface();
+        vgdesc.texture = Texture::interface();
         vgdesc.index_buffer = IndexBuffer::interface();
+        vgdesc.vertex_buffer = VertexBuffer::interface();
+        vgdesc.shader = Shader::interface();
+        vgdesc.program = Program::interface();
         vgdesc.swap = SwapChain::interface();
     }
 };

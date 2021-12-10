@@ -45,7 +45,35 @@ private:
 using TextureType = evgTextureType;
 using TextureSetup = evgTextureSetup;
 
-class Swap final {
+template <typename Ctype>
+class Interface {
+public:
+    using primitive_type = Ctype;
+    ~Interface() = default;
+
+protected:
+    Interface() = delete;
+    explicit Interface (const Ctype* i, evgHandle h)
+        : handle (h)
+    {
+        memcpy (&iface, i, sizeof (Ctype));
+    }
+
+    evgHandle handle { nullptr };
+    Ctype iface;
+
+private:
+    EL_DISABLE_COPY (Interface);
+};
+
+using ProgramInterface = Interface<evgProgramInterface>;
+using ShaderInterface = Interface<evgShaderInterface>;
+using SwapInterface = Interface<evgSwapInterface>;
+using TextureInterface = Interface<evgTextureInterface>;
+using VertexBufferInterface = Interface<evgVertexBufferInterface>;
+
+//=============================================================================
+class Swap final : private SwapInterface {
 public:
     ~Swap()
     {
@@ -54,16 +82,12 @@ public:
 
 private:
     friend class Device;
-    explicit Swap (const evgSwapInterface* i, evgHandle h) {
-        handle = h;
-        memcpy (&iface, i, sizeof (evgSwapInterface));
-    }
-    evgHandle handle = nullptr;
-    evgSwapInterface iface;
+    explicit Swap (const evgSwapInterface* i, evgHandle h)
+        : Interface<evgSwapInterface> (i, h) {}
     EL_DISABLE_COPY (Swap);
 };
 
-class Texture final {
+class Texture final : private TextureInterface {
 public:
     ~Texture() {}
 
@@ -72,23 +96,19 @@ public:
     bool is_3d() const noexcept { return info.type == EVG_TEXTURE_3D; }
     bool is_cube() const noexcept { return info.type == EVG_TEXTURE_CUBE; }
 
-    uint32_t width() const noexcept { return info.width; }
+    uint32_t width() const noexcept  { return info.width; }
     uint32_t height() const noexcept { return info.height; }
-    uint32_t depth() const noexcept { return info.depth; }
+    uint32_t depth() const noexcept  { return info.depth; }
 
 private:
     friend class Device;
-    explicit Texture (const evgDescriptor* d, evgHandle h)
+    explicit Texture (const evgTextureInterface*  i, evgHandle h)
+        : TextureInterface (i, h)
     {
-        handle = h;
-        memcpy (&desc, d, sizeof (evgDescriptor));
-        memset (&info, 0, sizeof (TextureSetup));
-        desc.texture_fill_setup (handle, &info);
+       iface.fill_setup (handle, &info);
     }
 
-    evgDescriptor desc;
     TextureSetup info;
-    evgHandle handle { nullptr };
 };
 
 class IndexBuffer final {
@@ -123,59 +143,72 @@ private:
     evgIndexArraySetup setup;
 };
 
-class VertexBuffer final {
+class VertexBuffer final : private VertexBufferInterface {
 public:
     ~VertexBuffer()
     {
+        if (handle != nullptr) {
+            iface.destroy (handle);
+            handle = nullptr;
+        }
         if (data != nullptr) {
             evg_vertex_data_free (data);
             data = nullptr;
         }
-
-        if (handle && f_destroy)
-            f_destroy (handle);
     }
 
-    inline void update() { f_update (handle); }
+    inline void update() { iface.flush (handle); }
     inline evgVec3* points() const noexcept { return data->points; }
     inline uint32_t size() const noexcept { return m_size; }
     inline uint32_t num_textures() const noexcept { return m_ntex; };
 
 private:
-    VertexBuffer() {}
     friend class Device;
-    evgHandle handle { nullptr };
-    std::function<void (evgHandle)> f_destroy;
-    std::function<void (evgHandle)> f_update;
-    evgVertexData* data { nullptr };
+    explicit VertexBuffer (const evgVertexBufferInterface* i, evgHandle h)
+        : VertexBufferInterface (i, h) {}
+
     uint32_t m_size { 0 };
     uint32_t m_ntex { 0 };
+    evgVertexData* data = nullptr;
 };
 
-class Shader final {
+class Shader final : private ShaderInterface {
 public:
-    ~Shader() {}
+    ~Shader()
+    {
+        if (handle) {
+            iface.destroy (handle);
+            handle = nullptr;
+        }
+    }
 
-    bool parse (const char* program) { return f_parse (handle, program); }
-    void add_uniform (int type, const char* name) { }
-    void uniforms() const noexcept {}
+    bool parse (const char* program) { return iface.parse (handle, program); }
+    void add_attribute (const char* name, evgAttributeType type, uint32_t index)
+    {
+        iface.add_attribute (handle, name, type, index);
+    }
+
+    void add_attribute (const char* name, evgAttributeType type)
+    {
+        add_attribute (name, type, 0);
+    }
 
 private:
     friend class Device;
     friend class Program;
-    Shader() {}
-    evgHandle handle = nullptr;
-    std::function<bool (evgHandle, const char*)> f_parse;
+    explicit Shader (const evgShaderInterface* i, evgHandle h)
+        : ShaderInterface (i, h) {}
 };
 
-class Uniform final {
+class Program final : private ProgramInterface {
 public:
-    Uniform() {}
-};
-
-class Program final {
-public:
-    ~Program() {}
+    ~Program()
+    {
+        if (handle) {
+            iface.destroy (handle);
+            handle = nullptr;
+        }
+    }
 
     bool link (Shader* verts, Shader* frags)
     {
@@ -185,172 +218,56 @@ public:
 
 private:
     friend class Device;
-    evgHandle handle = nullptr;
-    evgProgramInterface iface;
-    explicit Program (const evgProgramInterface* i, evgHandle h) {
-        handle = h;
-        memcpy (&iface, i, sizeof (evgProgramInterface));
-    }
+    explicit Program (const evgProgramInterface* i, evgHandle h)
+        : ProgramInterface (i, h) {}
 };
 
 class Device final {
 public:
-    ~Device()
-    {
-        destroy();
-    }
-
-    inline static std::unique_ptr<Device> open (const evgDescriptor* dptr)
-    {
-        if (auto device = evg_descriptor_valid (dptr) ? dptr->create() : nullptr)
-            return std::unique_ptr<Device> (new Device (dptr, device));
-        return nullptr;
-    }
+    static std::unique_ptr<Device> open (const evgDescriptor* dptr);
+    ~Device();
 
     //=========================================================================
-    inline void enter_context() { desc.enter_context (device); }
-    inline void leave_context() { desc.leave_context (device); }
-    inline void clear_context() { desc.clear_context (device); }
+    void enter_context();
+    void leave_context();
+    void clear_context();
 
     //=========================================================================
-    void load_program (Program* program) noexcept {
-        desc.load_program (device, program != nullptr ? program->handle : nullptr);
-    }
-
-    void load_index_buffer (IndexBuffer* const ib) noexcept
-    {
-        desc.load_index_buffer (device, ib != nullptr ? ib->handle : nullptr);
-    }
-
-    void load_vertex_buffer (VertexBuffer* vbuf) noexcept
-    {
-        desc.load_vertex_buffer (device, vbuf != nullptr ? vbuf->handle : nullptr);
-    }
-
-    void load_swap (const Swap* const swap) noexcept
-    {
-        desc.load_swap (device, swap != nullptr ? swap->handle : nullptr);
-    }
+    void load_program (Program* program) noexcept;
+    void load_index_buffer (IndexBuffer* const ib) noexcept;
+    void load_vertex_buffer (VertexBuffer* vbuf) noexcept;
+    void load_swap (const Swap* const swap) noexcept;
 
     //=========================================================================
-    void viewport (int x, int y, int width, int height)
-    {
-        desc.viewport (device, x, y, width, height);
-    }
-
-    void ortho (float left, float right, float top, float bottom, float near, float far)
-    {
-        desc.ortho (device, left, right, top, bottom, near, far);
-    }
-
-    void draw (egDrawMode mode, uint32_t start, uint32_t count) {
-        desc.draw (device, mode, start, count);
-    }
-
-    void present() {
-        desc.present (device);
-    }
-    
-    //=========================================================================
-    Swap* create_swap (const evgSwapSetup* setup)
-    {
-        auto iface = desc.swap;
-        if (auto handle = iface->create (device, setup)) {
-            auto swap = new Swap (iface, handle);
-            return swap;
-        }
-
-        return nullptr;
-    }
+    void viewport (int x, int y, int width, int height);
+    void ortho (float left, float right, float top, float bottom, float near, float far);
+    void draw (egDrawMode mode, uint32_t start, uint32_t count);
+    void present();
 
     //=========================================================================
-    Texture* create_2d_texture (egColorFormat format,
-                                uint32_t width,
-                                uint32_t height,
-                                const uint8_t** data)
-    {
-        evgTextureSetup setup = {
-            .type = EVG_TEXTURE_2D,
-            .format = format,
-            .levels = 1,
-            .flags = EVG_OPT_DYNAMIC,
-            .width = width,
-            .height = height
-        };
-
-        if (auto handle = desc.texture_create (device, &setup, data)) {
-            auto obj = new Texture (&desc, handle);
-            return obj;
-        }
-
-        return nullptr;
-    }
+    Swap* create_swap (const evgSwapSetup* setup);
 
     //=========================================================================
-    IndexBuffer* create_index_buffer (uint32_t size, uint32_t flags)
-    {
-        auto const iface = desc.index_buffer;
-        if (auto handle = iface->create (device, size, flags)) {
-            auto ib = new IndexBuffer (iface, handle);
-            return ib;
-        }
-        return nullptr;
-    }
+    Texture* create_2d_texture (egColorFormat format, uint32_t width, uint32_t height, const uint8_t** data);
+    Texture* create_3d_texture() { return nullptr; }
 
     //=========================================================================
-    VertexBuffer* create_vertex_buffer (evgVertexData* data, uint32_t flags)
-    {
-        if (auto handle = desc.vertex_buffer_create (device, data, flags)) {
-            auto buf = new VertexBuffer();
-            buf->handle = handle;
-            buf->data = data;
-            buf->f_destroy = desc.vertex_buffer_destroy;
-            buf->f_update = desc.vertex_buffer_flush;
-            return buf;
-        }
-
-        return nullptr;
-    }
+    IndexBuffer* create_index_buffer (uint32_t size, uint32_t flags);
 
     //=========================================================================
-    Shader* create_shader (evgShaderType type)
-    {
-        if (auto handle = desc.shader_create (device, type)) {
-            auto shader = new Shader();
-            shader->handle = handle;
-            shader->f_parse = desc.shader_parse;
-            return shader;
-        }
-        return nullptr;
-    }
+    VertexBuffer* create_vertex_buffer (evgVertexData* data, uint32_t flags);
 
-    Program* create_program()
-    {
-        auto iface = desc.program;
-        if (auto handle = iface->create (device)) {
-            auto program = new Program (iface, handle);
-            return program;
-        }
+    //=========================================================================
+    Shader* create_shader (evgShaderType type);
 
-        return nullptr;
-    }
+    //=========================================================================
+    Program* create_program();
 
 private:
-    explicit Device (const evgDescriptor* ds, evgHandle d)
-        : device (d)
-    {
-        memcpy (&desc, ds, sizeof (evgDescriptor));
-    }
-
+    explicit Device (const evgDescriptor* ds, evgHandle d);
     evgHandle device { nullptr };
     evgDescriptor desc;
-
-    void destroy()
-    {
-        if (device != nullptr && desc.destroy != nullptr)
-            desc.destroy (device);
-        device = nullptr;
-    }
+    void destroy();
 };
 #endif
 
@@ -372,12 +289,12 @@ struct Descriptor : evgDescriptor {
 private:
     inline static void _enter_context (evgHandle dh)
     {
-        (static_cast<device_type*> (dh))->enter_context();
+        (static_cast<Dev*> (dh))->enter_context();
     }
 
     inline static void _leave_context (evgHandle dh)
     {
-        (static_cast<device_type*> (dh))->leave_context();
+        (static_cast<Dev*> (dh))->leave_context();
     }
 };
 

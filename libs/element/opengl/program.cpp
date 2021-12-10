@@ -136,15 +136,6 @@ void Program::load_buffers (VertexBuffer* vb, IndexBuffer* ib)
     }
 }
 
-void Shader::add_attribute (evgHandle sh, evgAttributeType type, evgValueType vtype)
-{
-    gl::unused (sh, type, vtype);
-}
-
-void Shader::add_uniform (evgHandle sh, evgValueType vtype)
-{
-}
-
 evgHandle Program::_create (evgHandle dh)
 {
     auto device = (Device*) dh;

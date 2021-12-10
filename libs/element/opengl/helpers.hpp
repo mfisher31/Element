@@ -57,7 +57,7 @@ static inline GLenum topology (egDrawMode input) {
         case EVG_DRAW_MODE_TRIANGLES: return GL_TRIANGLES;
         case EVG_DRAW_MODE_TRIANGLES_STRIP: return GL_TRIANGLE_STRIP;
     }
-    return (GLenum)-1;
+    return GL_INVALID_ENUM;
 }
 
 static inline GLenum shader_type (evgShaderType input)
@@ -70,7 +70,7 @@ static inline GLenum shader_type (evgShaderType input)
         default:
             break;
     }
-    return 0;
+    return GL_INVALID_ENUM;
 }
 
 static inline GLenum attribute_data_type (evgAttributeType input) {

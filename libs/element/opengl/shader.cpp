@@ -67,14 +67,6 @@ bool Shader::parse (const char* program)
         std::free (error_string);
     }
 
-    // if (success)
-    // 	success = gl_add_params (shader, glsp);
-    /* Only vertex shaders actually require input attributes */
-    // if (success && shader->type == GS_SHADER_VERTEX)
-    // 	success = gl_process_attribs (shader, glsp);
-
-    // if (success)
-    // 	gl_add_samplers(shader, glsp);
     if (success)
         gl_shader = shader;
 
@@ -84,5 +76,6 @@ bool Shader::parse (const char* program)
 void Shader::release()
 {
 }
+
 
 } // namespace gl

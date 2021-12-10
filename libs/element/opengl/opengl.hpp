@@ -33,28 +33,21 @@ class VertexBuffer;
 class Texture;
 class Shader;
 
-struct WindowSetup {
-    WindowSetup() = default;
-    virtual ~WindowSetup() = default;
-};
-
 class Platform {
 public:
     virtual ~Platform() = default;
     virtual bool initialize() = 0;
 
     //=========================================================================
-    virtual SwapChain* create_swap (const evgSwapSetup* setup) =0;
+    virtual SwapChain* create_swap (const evgSwapSetup* setup) = 0;
     virtual void load_swap (const SwapChain* swap) = 0;
+    virtual void swap_buffers() = 0;
 
     //=========================================================================
     virtual void* context_handle() const noexcept = 0;
     virtual void enter_context() = 0;
     virtual void leave_context() = 0;
     virtual void clear_context() = 0;
-
-    //==========================================================================
-    virtual void swap_buffers() = 0;
 
 protected:
     Platform() = default;
@@ -91,7 +84,8 @@ public:
     static void destroy (evgHandle device);
 
     //=========================================================================
-    inline static void _viewport (evgHandle dh, int x, int y, int w, int h) {
+    inline static void _viewport (evgHandle dh, int x, int y, int w, int h)
+    {
         (static_cast<Device*> (dh))->viewport (x, y, w, h);
     }
 
@@ -112,10 +106,11 @@ public:
     static void _flush (evgHandle dh);
 
     //=========================================================================
-    inline static void _clear_context (evgHandle dh) {
+    inline static void _clear_context (evgHandle dh)
+    {
         (static_cast<Device*> (dh))->platform->clear_context();
     }
-    
+
     inline static void _load_index_buffer (evgHandle dh, evgHandle ibh)
     {
         (static_cast<Device*> (dh))->active_index_buffer =
@@ -136,8 +131,7 @@ public:
 
     inline static void _load_swap (evgHandle dh, evgHandle sh)
     {
-        (static_cast<Device*> (dh))->platform->load_swap (
-            static_cast<const SwapChain*> (sh));
+        (static_cast<Device*> (dh))->platform->load_swap (static_cast<const SwapChain*> (sh));
     }
 
     inline static void _load_texture (evgHandle dh, evgHandle sh, int index)
@@ -170,7 +164,8 @@ public:
     Device* device { nullptr };
     SwapSetup setup { 0 };
 
-    static const evgSwapInterface* interface() {
+    static const evgSwapInterface* interface()
+    {
         static const evgSwapInterface I = {
             .create = _create,
             .destroy = _destroy
@@ -179,11 +174,13 @@ public:
     }
 
 private:
-    static evgHandle _create (evgHandle dh, const evgSwapSetup* setup) {
+    static evgHandle _create (evgHandle dh, const evgSwapSetup* setup)
+    {
         return (static_cast<Device*> (dh))->platform->create_swap (setup);
     }
 
-    static void _destroy (evgHandle sh) {
+    static void _destroy (evgHandle sh)
+    {
         delete static_cast<SwapChain*> (sh);
     }
 };
@@ -222,6 +219,20 @@ public:
     inline bool is_dynamic() const noexcept { return dynamic; }
     inline bool is_render_target() const noexcept { return render_target; }
     inline bool use_mipmaps() const noexcept { return mipmaps; }
+
+    //=========================================================================
+    inline static const evgTextureInterface* interface() {
+        static const evgTextureInterface I = {
+            .create = _create,
+            .destroy = _destroy,
+            .fill_setup = _fill_setup
+        };
+        return &I;
+    }
+
+    static evgHandle _create (evgHandle dh, const evgTextureSetup* setup, const uint8_t** data);
+    static void _destroy (evgHandle t);
+    static void _fill_setup (evgHandle tex, evgTextureSetup* setup);
 
 protected:
     explicit Texture (Device& dev, const TextureSetup& setup);
@@ -341,6 +352,50 @@ struct VertexBuffer {
 
     inline GLuint get_points() const noexcept { return points; }
 
+    inline static const evgVertexBufferInterface* interface()
+    {
+        static const evgVertexBufferInterface I = {
+            .create = _create,
+            .destroy = _destroy,
+            .data = _data,
+            .flush = _flush
+        };
+        return &I;
+    }
+
+    inline static evgHandle _create (evgHandle device,
+                                     evgVertexData* data,
+                                     uint32_t flags)
+    {
+        auto vbuf = std::make_unique<VertexBuffer> (data, flags);
+        if (! vbuf->create_buffers()) {
+            printf ("[opengl] failed to create vertex buffer\n");
+            return nullptr;
+        }
+        return vbuf.release();
+        return nullptr;
+    }
+
+    inline static void _destroy (evgHandle v)
+    {
+        if (auto vbuf = static_cast<VertexBuffer*> (v)) {
+            vbuf->destroy_buffers();
+            delete vbuf;
+        }
+    }
+
+    inline static evgVertexData* _data (evgHandle v)
+    {
+        auto vbuf = (VertexBuffer*) v;
+        return vbuf != nullptr ? vbuf->get_data() : nullptr;
+    }
+
+    inline static void _flush (evgHandle v)
+    {
+        auto vbuf = (VertexBuffer*) v;
+        vbuf != nullptr ? vbuf->flush() : void();
+    }
+
 private:
     size_t num_vectors = 0;
     bool dynamic = false;
@@ -366,18 +421,22 @@ public:
     Shader (Device& d, evgShaderType t)
         : device (d), type (t)
     {
-        if (type == EVG_SHADER_VERTEX)
-            atts.push_back ({ 0, EVG_ATTRIB_POSITION, "aPos" });
+        atts.reserve (4);
     }
 
     ~Shader() {}
 
     struct Attribute {
-        Attribute (uint32_t i, evgAttributeType t, const std::string& n)
+        Attribute (const std::string& n, evgAttributeType t, uint32_t i)
             : index (i), type (t), name (n) {}
 
-        uint32_t index;
+        std::string name;
         evgAttributeType type;
+        uint32_t index;
+    };
+
+    struct Uniform {
+        Uniform() {}
         std::string name;
     };
 
@@ -388,14 +447,49 @@ public:
 
     inline const std::vector<Attribute>& attributes() const noexcept { return atts; }
 
-    static void add_attribute (evgHandle sh, evgAttributeType type, evgValueType vtype);
-    static void add_uniform (evgHandle sh, evgValueType vtype);
+    //=========================================================================
+    inline static const evgShaderInterface* interface()
+    {
+        static const evgShaderInterface I = {
+            .create = _create,
+            .destroy = _destroy,
+            .parse = _parse,
+            .add_attribute = _add_attribute,
+            .add_uniform = _add_uniform
+        };
+        return &I;
+    }
+
+    inline static evgHandle _create (evgHandle dh, evgShaderType type)
+    {
+        auto device = static_cast<Device*> (dh);
+        return new Shader (*device, type);
+    }
+
+    inline static void _destroy (evgHandle sh)
+    {
+        delete static_cast<Shader*> (sh);
+    }
+
+    inline static bool _parse (evgHandle sh, const char* text)
+    {
+        return (static_cast<Shader*> (sh))->parse (text);
+    }
+
+    inline static void _add_attribute (evgHandle sh, const char* name, evgAttributeType type, uint32_t index)
+    {
+        (static_cast<Shader*> (sh))->atts.push_back ({ name, type, index });
+    }
+
+    inline static void _add_uniform (evgHandle sh, evgValueType vtype)
+    {
+        // (static_cast<Shader*>(sh))->unis.push_back ({index, type, name});
+    }
 
 private:
     Device& device;
     evgShaderType type;
     GLuint gl_shader = 0;
-
     std::vector<Attribute> atts;
 };
 
