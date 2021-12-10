@@ -48,6 +48,7 @@ BraceWrapping:
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializersBeforeComma: false
 BreakStringLiterals: false
+
 ColumnLimit: 0
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
@@ -63,12 +64,14 @@ IndentWrappedFunctionNames: true
 IndentPPDirectives: BeforeHash
 
 KeepEmptyLinesAtTheStartOfBlocks: false
+
 Language: Cpp
 MaxEmptyLinesToKeep: 1
-NamespaceIndentation: Inner
+NamespaceIndentation: None
 PointerAlignment: Left
 ReflowComments: false
 SortIncludes: true
+
 SpaceAfterCStyleCast: true
 SpaceAfterLogicalNot: true
 SpaceBeforeAssignmentOperators: true
@@ -82,9 +85,11 @@ SpacesInContainerLiterals: true
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: "c++17"
+
 TabWidth: 4
 UseTab: Never
 ForEachMacros: [ EL_FEATURES_FOREACH, BOOST_FOREACH ]
+
 ---
 Language: ObjC
 BasedOnStyle: Chromium
