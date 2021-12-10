@@ -22,7 +22,8 @@ public:
 
     void resized()
     {
-        embed->centreWithSize (640, 360);
+        embed->setBounds (getLocalBounds().reduced (10));
+        // embed->centreWithSize (640, 360);
     }
 
     void paint (juce::Graphics& g)
@@ -32,7 +33,8 @@ public:
         g.drawText ("Hello World", getLocalBounds().toFloat(), juce::Justification::centred, true);
     }
 
-    void setDisplayEnabled (bool enabled) {
+    void setDisplayEnabled (bool enabled)
+    {
         if (enabled) {
             addAndMakeVisible (embed.get());
             embed->setVisible (true);
@@ -42,7 +44,8 @@ public:
         }
     }
 
-    evgSwapSetup getSwapSetup () const {
+    evgSwapSetup getSwapSetup() const
+    {
         evgSwapSetup setup;
         setup.adapter = 0;
         setup.width = 640;
@@ -197,7 +200,7 @@ static int ui_main (elHandle handle, int argc, const char* argv[])
         auto setup = ui->window->getTestContent()->getSwapSetup();
         if (nullptr != ui->context->test_create_video_display (&setup))
             ui->window->getTestContent()->setDisplayEnabled (true);
-        
+
 #endif
         JUCE_TRY
         {

@@ -190,6 +190,8 @@ def element_sources (ctx):
         libs/element/src/scripting.cpp
         libs/element/src/strings.cpp
         libs/element/src/video.cpp
+        libs/element/src/evg/context.cpp
+        libs/element/src/evg/device.cpp
         libs/element/src/graphics_context.cpp
         libs/element/include/element/source.cpp
         '''.split()
