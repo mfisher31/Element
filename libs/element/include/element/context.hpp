@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <string>
 #include <element/element.h>
@@ -14,12 +15,13 @@ class Video;
 
 class VideoDisplay {
 public:
-    ~VideoDisplay() = default;
+    virtual ~VideoDisplay() = default;
 
-    void get_size (int& width, int& height) const { width = 0; height = 0; }
+protected:
+    VideoDisplay () = default;
 
 private:
-    VideoDisplay (egSwapChain* swap);
+    EL_DISABLE_COPY(VideoDisplay);
 };
 
 class EL_API Context {
@@ -28,12 +30,18 @@ public:
     virtual ~Context();
     
     //=========================================================================
+    VideoDisplay* test_create_video_display (const evgSwapSetup*);
+    
     void test_open_module (const std::string& path);
     void test_load_modules();
     int test_main (const std::string module_id, int argc, const char* argv[]);
     void* test_lua_state() const;
     void test_add_module_search_path (const std::string&);
     void test_discover_modules();
+
+    inline void test_print() {
+        std::clog <<  "test print" << std::endl;
+    }
 
 private:
     EL_DISABLE_COPY(Context);

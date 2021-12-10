@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "dynlib.h"
+#include "element/evg/device.hpp"
 #include "element/context.hpp"
 #include "element/graphics.h"
 #include "element/plugin.h"
@@ -137,7 +138,7 @@ public:
         } else if (strcmp (f.ID, EL_EXTENSION__Main) == 0) {
             main = (const elMain*) f.data;
         } else if (strcmp (f.ID, "el.GraphicsDevice") == 0) {
-            backend.video->load_device_descriptor ((const egDeviceDescriptor*) f.data);
+            backend.video->load_device_descriptor ((const evgDescriptor*) f.data);
         } else {
             handled = false;
             for (const auto& ex : manifest.provides) {
@@ -332,6 +333,10 @@ void Context::test_load_modules()
         }
     }
 
+    auto ctxfeature = (elFeature*) malloc (sizeof (elFeature));
+    ctxfeature->ID = strdup ("el.Context");
+    ctxfeature->data = this;
+    features.push_back (ctxfeature);
     features.push_back ((elFeature*) nullptr);
     elFeatures fptr = &features.front();
 
@@ -373,6 +378,10 @@ void Context::test_add_module_search_path (const std::string& path)
 void Context::test_discover_modules()
 {
     modules->discover();
+}
+
+VideoDisplay* Context::test_create_video_display (const evgSwapSetup* setup) {
+    return video->create_display (setup);
 }
 
 } // namespace element
