@@ -3,14 +3,18 @@ import plugins
 opengl = bld (
     features = 'cxx cxxshlib',
     source = '''
+        index_buffer.cpp
         opengl.cpp
+        program.cpp
+        shader.cpp
         texture2d.cpp
+        vertex_buffer.cpp
     '''.split(),
     includes = [ '.', '../include', 'glad/include' ],
-    name = 'ELEMENT_OPENGL',
+    name = 'EVG_OPENGL',
     target = '../../../modules/OpenGL.element/OpenGL',
-    cppflags = ['-fPIC' ],
-    linkflags = [],
+    cppflags = ['-fPIC', '-DPIC' ],
+    linkflags = ['-fPIC', '-DPIC' ],
     env = plugins.derive_env (bld),
     use = []
 )

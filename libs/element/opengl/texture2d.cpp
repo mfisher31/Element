@@ -1,17 +1,19 @@
 
 #include "helpers.hpp"
 
-egTexture::egTexture (egDevice& dev, const egTextureSetup& s)
+namespace gl {
+
+Texture::Texture (Device& dev, const evgTextureSetup& s)
     : device (dev)
 {
-    memcpy (&_setup, &s, sizeof (egTextureSetup));
+    memcpy (&_setup, &s, sizeof (evgTextureSetup));
     gl_format = gl::color_format (_setup.format);
     gl_format_internal = gl::color_format_internal (_setup.format);
     gl_format_type = gl::color_format_type (_setup.format);
-    dynamic = (_setup.flags & EVG_TEXTURE_DYNAMIC) != 0;
-    render_target = (_setup.flags & EVG_TEXTURE_RENDER_TARGET) != 0;
-    dummy = (_setup.flags & EVG_TEXTURE_REF_BUFFER) != 0;
-    mipmaps = (_setup.flags & EVG_TEXTURE_USE_MIPMAPS) != 0;
+    dynamic = (_setup.flags & EVG_OPT_DYNAMIC) != 0;
+    render_target = (_setup.flags & EVG_OPT_RENDER_TARGET) != 0;
+    dummy = (_setup.flags & EVG_OPT_DUMMY) != 0;
+    mipmaps = (_setup.flags & EVG_OPT_USE_MIPMAPS) != 0;
 }
 
 static inline uint32_t evg_color_format_is_compressed (egColorFormat format)
@@ -25,11 +27,11 @@ static inline uint32_t evg_color_format_is_compressed (egColorFormat format)
 static inline uint32_t evg_color_format_bpp (egColorFormat format)
 {
     switch (format) {
-        case EL_COLOR_FORMAT_UNKNOWN:
+        case EVG_COLOR_FORMAT_UNKNOWN:
             return 0;
-        case EL_COLOR_FORMAT_RGBA:
-        case EL_COLOR_FORMAT_BGRA:
-        case EL_COLOR_FORMAT_BGRX:
+        case EVG_COLOR_FORMAT_RGBA:
+        case EVG_COLOR_FORMAT_BGRA:
+        case EVG_COLOR_FORMAT_BGRX:
             return 32;
         default:
             break;
@@ -56,7 +58,7 @@ static inline uint32_t evg_nlevels_2d (uint32_t width, uint32_t height) {
     return evg_nlevels (width, height, 1);
 }
 
-bool egTexture2D::bind_data (const uint8_t** data)
+bool Texture2D::bind_data (const uint8_t** data)
 {
     uint32_t row_size = width() * evg_color_format_bpp (format());
     uint32_t tex_size = height() * row_size / 8;
@@ -81,7 +83,7 @@ bool egTexture2D::bind_data (const uint8_t** data)
     return success;
 }
 
-bool egTexture2D::upload_data (const uint8_t** data)
+bool Texture2D::upload_data (const uint8_t** data)
 {
     if (! gl::gen_textures (1, &texture))
         return false;
@@ -111,4 +113,6 @@ bool egTexture2D::upload_data (const uint8_t** data)
     }
 
     return false;
+}
+
 }

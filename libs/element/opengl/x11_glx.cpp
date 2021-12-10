@@ -63,10 +63,16 @@ static int log_x11_error (Display* display, XErrorEvent* error)
     return 0;
 }
 
-struct GLXWindowSetup final : public gl::WindowSetup {
+struct GLXSwap final : public gl::SwapChain {
     xcb_window_t ID { 0 };
     GLXFBConfig config { 0 };
     int screen { -1 };
+
+    explicit GLXSwap (const evgSwapSetup* s)
+    {
+        memcpy (&this->setup, s, sizeof (evgSwapSetup));
+    }
+
     inline constexpr bool valid() const noexcept { return config != 0 && ID != 0 && screen >= 0; }
 };
 
@@ -87,14 +93,133 @@ public:
     }
 
     //========================================================================
-    std::unique_ptr<WindowSetup> create_window_setup() const override
+    SwapChain* create_swap (const evgSwapSetup* setup) override
     {
-        return std::unique_ptr<WindowSetup> (new GLXWindowSetup());
+        auto swap = std::make_unique<GLXSwap> (setup);
+        if (! attach_swap (swap.get()))
+            return nullptr;
+        return swap.release();
     }
 
-    bool attach_swap_chain (egSwapChain* swap) override
+    void load_swap (const SwapChain* s) override
     {
-        if (swap == nullptr || nullptr == swap->window)
+        auto swap = dynamic_cast<const GLXSwap*> (s);
+        if (active_swap == swap)
+            return;
+
+        active_swap = swap;
+
+        if (active_swap) {
+            if (! glXMakeContextCurrent (display, active_swap->ID, active_swap->ID, context))
+                std::clog << "Failed to make context current." << std::endl;
+        } else {
+            if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context)) {
+                std::clog << "Failed to make context current." << std::endl;
+            }
+        }
+    }
+
+    //=========================================================================
+    void* context_handle() const noexcept override
+    {
+        return static_cast<void*> (context);
+    }
+
+    void enter_context() override
+    {
+        if (active_swap != nullptr) {
+            if (! glXMakeContextCurrent (display, active_swap->ID, active_swap->ID, context))
+                std::clog << "Failed to make swap current (swap)" << std::endl;
+        } else {
+            if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context))
+                std::clog << "Failed to make context current (internal)" << std::endl;
+        }
+    }
+
+    void leave_context() override
+    {
+        if (! glXMakeContextCurrent (display, None, None, context))
+            std::clog << "Failed to leave context" << std::endl;
+    }
+
+    void clear_context() override
+    {
+        if (! glXMakeContextCurrent (display, None, None, NULL))
+            std::clog << "Failed to clear contex" << std::endl;
+    }
+
+    //=========================================================================
+    void create_window() {}
+    void destroy_window() {}
+
+    //=========================================================================
+    void get_size (const GLXSwap* swap, uint32_t* width, uint32_t* height)
+    {
+        xcb_connection_t* xcb_conn = XGetXCBConnection (display);
+        if (auto geometry = get_window_geometry (xcb_conn, swap->ID)) {
+            *width = geometry->width;
+            *height = geometry->height;
+            std::free (geometry);
+        }
+    }
+
+    //=========================================================================
+    void swap_buffers() override
+    {
+        if (active_swap == nullptr)
+            return;
+
+        if (! present_initialized) {
+            if (GLAD_GLX_EXT_swap_control)
+                swap_type = GLXSwapType::EXT;
+            else if (GLAD_GLX_MESA_swap_control)
+                swap_type = GLXSwapType::MESA;
+            else if (GLAD_GLX_SGI_swap_control)
+                swap_type = GLXSwapType::SGI;
+            else
+                swap_type = GLXSwapType::NORMAL;
+            present_initialized = true;
+        }
+
+        // xcb_connection_t* xcb_conn = XGetXCBConnection (display);
+        // xcb_generic_event_t* xcb_event = nullptr;
+        // while ((xcb_event = xcb_poll_for_event (xcb_conn))) {
+        //     /* TODO: Handle XCB events. */
+        //     free (xcb_event);
+        // }
+
+        switch (swap_type) {
+            case GLXSwapType::EXT:
+                glXSwapIntervalEXT (display, active_swap->ID, 0);
+                break;
+            case GLXSwapType::MESA:
+                glXSwapIntervalMESA (0);
+                break;
+            case GLXSwapType::SGI:
+                glXSwapIntervalSGI (0);
+                break;
+            case GLXSwapType::NORMAL:
+            default:
+                break;
+        }
+
+        glXSwapBuffers (display, active_swap->ID);
+    }
+
+private:
+    Display* display { nullptr };
+    GLXContext context { 0 };
+    GLXPbuffer pbuffer { 0 };
+
+    const GLXSwap* active_swap { nullptr };
+    GLXSwapType swap_type = GLXSwapType::NORMAL;
+    bool present_initialized = false;
+
+    friend void glx_platform_delete (Platform* p);
+
+    bool attach_swap (GLXSwap* swap)
+    {
+        if (swap == nullptr)
             return false;
 
         auto xcb_conn = XGetXCBConnection (display);
@@ -152,133 +277,14 @@ public:
         xcb_create_colormap (xcb_conn, XCB_COLORMAP_ALLOC_NONE, colormap, parent, visual);
         xcb_create_window (xcb_conn, depth, wid, parent, 0, 0, geometry->width, geometry->height, 0, 0, visual, mask, mask_values);
 
-        auto window = dynamic_cast<GLXWindowSetup*> (swap->window.get());
-        window->config = fb_config[0];
-        window->ID = wid;
-        window->screen = screen_num;
-        xcb_map_window (xcb_conn, window->ID);
+        swap->config = fb_config[0];
+        swap->ID = wid;
+        swap->screen = screen_num;
+        xcb_map_window (xcb_conn, swap->ID);
 
         free_xobjs();
         return true;
     }
-
-    void detach_swap_chain (egSwapChain* swap) override
-    {
-        auto window = dynamic_cast<GLXWindowSetup*> (swap->window.get());
-        window->config = nullptr;
-        window->ID = 0;
-        window->screen = -1;
-    }
-
-    void load_swap_chain (const egSwapChain* swap) override
-    {
-        if (active_swap == swap)
-            return;
-
-        active_swap = swap;
-
-        if (active_swap) {
-            if (auto window = (GLXWindowSetup*) swap->window.get())
-                if (! glXMakeContextCurrent (display, window->ID, window->ID, context))
-                    std::clog << "Failed to make context current." << std::endl;
-        } else {
-            if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context)) {
-                std::clog << "Failed to make context current." << std::endl;
-            }
-        }
-    }
-    //=========================================================================
-    void* context_handle() const noexcept override
-    {
-        return static_cast<void*> (context);
-    }
-
-    void enter_context() override
-    {
-        if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context))
-            std::clog << "Failed to make context current." << std::endl;
-    }
-
-    void leave_context() override
-    {
-        if (! glXMakeContextCurrent (display, None, None, context))
-            std::clog << "Failed to leave context" << std::endl;
-    }
-
-    void clear_context() override
-    {
-        if (! glXMakeContextCurrent (display, None, None, NULL))
-            std::clog << "Failed to clear contex" << std::endl;
-    }
-
-    //=========================================================================
-    void create_window() {}
-    void destroy_window() {}
-
-    //=========================================================================
-    void get_size (const SwapChain* swap, uint32_t* width, uint32_t* height)
-    {
-        xcb_connection_t* xcb_conn = XGetXCBConnection (display);
-        xcb_window_t window = (*(const GLXWindowSetup*) swap).ID;
-        if (auto geometry = get_window_geometry (xcb_conn, window)) {
-            *width = geometry->width;
-            *height = geometry->height;
-            std::free (geometry);
-        }
-    }
-
-    //=========================================================================
-    void swap_buffers() override
-    {
-        auto window = ((GLXWindowSetup*) active_swap->window.get())->ID;
-
-        if (! present_initialized) {
-            if (GLAD_GLX_EXT_swap_control)
-                swap_type = GLXSwapType::EXT;
-            else if (GLAD_GLX_MESA_swap_control)
-                swap_type = GLXSwapType::MESA;
-            else if (GLAD_GLX_SGI_swap_control)
-                swap_type = GLXSwapType::SGI;
-            else
-                swap_type = GLXSwapType::NORMAL;
-            present_initialized = true;
-        }
-
-        xcb_connection_t* xcb_conn = XGetXCBConnection (display);
-        xcb_generic_event_t* xcb_event = nullptr;
-        while ((xcb_event = xcb_poll_for_event (xcb_conn))) {
-            /* TODO: Handle XCB events. */
-            free (xcb_event);
-        }
-
-        switch (swap_type) {
-            case GLXSwapType::EXT:
-                glXSwapIntervalEXT (display, window, 0);
-                break;
-            case GLXSwapType::MESA:
-                glXSwapIntervalMESA (0);
-                break;
-            case GLXSwapType::SGI:
-                glXSwapIntervalSGI (0);
-                break;
-            case GLXSwapType::NORMAL:
-            default:
-                break;
-        }
-
-        glXSwapBuffers (display, window);
-    }
-
-private:
-    Display* display { nullptr };
-    GLXContext context { 0 };
-    GLXPbuffer pbuffer { 0 };
-
-    const egSwapChain* active_swap { nullptr };
-    GLXSwapType swap_type = GLXSwapType::NORMAL;
-    bool present_initialized = false;
-
-    friend void glx_platform_delete (Platform* p);
 };
 
 /* Returns -1 on invalid screen. */
@@ -424,8 +430,10 @@ public:
     using parent_type = std::unique_ptr<T, XDeleter>;
     unique_xptr() : parent_type (nullptr, __delete) {}
     unique_xptr (T* ptr) : parent_type (ptr, __delete) {}
+
 private:
-    static int __delete (void* data) {
+    static int __delete (void* data)
+    {
         std::clog << __PRETTY_FUNCTION__ << std::endl;
         return XFree (data);
     }
