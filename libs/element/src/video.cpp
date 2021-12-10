@@ -17,7 +17,7 @@ struct fps_to_nanoseconds {
 using FPS30 = fps_to_nanoseconds<30>;
 using FPS60 = fps_to_nanoseconds<60>;
 using FPS24 = fps_to_nanoseconds<24>;
-using FPS5 = fps_to_nanoseconds<5>;
+using FPS5  = fps_to_nanoseconds<5>;
 
 class TestDisplay : public VideoDisplay {
 public:
@@ -63,7 +63,7 @@ static bool process_video (Video& video)
         return false;
 
     const auto stop_requested = video.should_stop();
-    const auto interval = fps_to_nanoseconds<2>::value;
+    const auto interval = fps_to_nanoseconds<24>::value;
     auto& device = video.graphics_device();
 
     {
