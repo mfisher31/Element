@@ -115,6 +115,7 @@ public:
 
         if (program == nullptr) {
             vshader.reset (g.reserve_vertex_shader());
+            vshader->add_attribute ("aPos", EVG_ATTRIB_POSITION);
             fshader.reset (g.reserve_fragment_shader());
             program.reset (g.reserve_program());
         }
@@ -129,17 +130,18 @@ public:
         auto& device = g.get_device();
 
         auto pts = verts->points();
-        evg_vec3_set (pts, -0.5f, -0.5f, 0.0);
-        evg_vec3_set (pts + 1, 0.5f, -0.5f, 0.0);
-        evg_vec3_set (pts + 2, 0.0f, 0.5f, 0.0);
+        evg_vec3_set (pts,    -1.0f, -1.0f, 0.0);
+        evg_vec3_set (pts + 1, 1.0f, -1.0f, 0.0);
+        evg_vec3_set (pts + 2, 0.0f,  1.0f, 0.0);
         verts->update();
 
         device.load_index_buffer (nullptr);
         device.load_vertex_buffer (verts.get());
         device.load_program (program.get());
-        device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 3);
+        device.draw (EVG_DRAW_MODE_TRIANGLES_STRIP, 0, 3);
     }
 
+    // void expose_rectangle ()
 private:
     friend class TestVideoSource;
     TestVideoSource& source;
@@ -150,6 +152,7 @@ private:
     std::unique_ptr<evg::VertexBuffer> verts;
     std::unique_ptr<evg::IndexBuffer> index;
     bool program_linked = false;
+    int ticker = 0;
 };
 
 TestVideoSource::TestVideoSource()
