@@ -113,11 +113,6 @@ bool VertexBuffer::destroy_buffers()
 
     uv_buffers.clear();
 
-    if (data != nullptr) {
-        evg_vertex_data_free (data);
-        data = nullptr;
-    }
-
     return true;
 }
 
