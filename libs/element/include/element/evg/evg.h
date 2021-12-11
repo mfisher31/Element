@@ -301,12 +301,12 @@ typedef struct {
     void (*load_texture) (evgHandle device, evgHandle texture, int index);
     void (*load_vertex_buffer) (evgHandle device, evgHandle vbuf);
 
-    const evgTextureInterface* texture;
-    const evgVertexBufferInterface* vertex_buffer;
-    const evgShaderInterface* shader;
-    const evgSwapInterface* swap;
-    const evgProgramInterface* program;
+    const evgSwapInterface* swap;    
     const evgIndexBufferInterface* index_buffer;
+    const evgVertexBufferInterface* vertex_buffer;
+    const evgTextureInterface* texture;
+    const evgShaderInterface* shader;
+    const evgProgramInterface* program;
 } evgDescriptor;
 
 inline static bool evg_descriptor_valid (const evgDescriptor* desc)

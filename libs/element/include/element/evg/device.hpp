@@ -151,6 +151,7 @@ public:
             iface.destroy (handle);
             handle = nullptr;
         }
+        
         if (data != nullptr) {
             evg_vertex_data_free (data);
             data = nullptr;
