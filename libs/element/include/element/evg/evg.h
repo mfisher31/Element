@@ -20,21 +20,21 @@ typedef enum {
     EVG_COLOR_FORMAT_RGBA,
     EVG_COLOR_FORMAT_BGRX,
     EVG_COLOR_FORMAT_BGRA
-} egColorFormat;
+} evgColorFormat;
 
 typedef enum {
     EVG_DRAW_MODE_POINTS,
     EVG_DRAW_MODE_LINES,
     EVG_DRAW_MODE_LINES_STRIP,
     EVG_DRAW_MODE_TRIANGLES,
-    EVG_DRAW_MODE_TRIANGLES_STRIP
-} egDrawMode;
+    EVG_TRIANGLE_STRIP
+} evgDrawMode;
 
 typedef enum {
     EVG_CULL_BACK,
     EVG_CULL_FRONT,
     EVG_CULL_OFF
-} egCullMode;
+} evgCullMode;
 
 typedef enum {
     EVG_TEXTURE_2D,
@@ -48,14 +48,20 @@ typedef enum {
     EVG_ZSTENCIL_24_S8,
     EVG_ZSTENCIL_32F,
     EVG_ZSTENCIL_32F_S8X24,
-} egZstencilFormat;
+} evgZstencilFormat;
 
-enum {
-    EVG_OPT_USE_MIPMAPS = (1 << 0),
-    EVG_OPT_DYNAMIC = (1 << 1),
-    EVG_OPT_RENDER_TARGET = (1 << 2),
-    EVG_OPT_DUMMY = (1 << 3)
-};
+
+#define EVG_OPT_USE_MIPMAPS     (1 << 0)
+#define EVG_OPT_DYNAMIC         (1 << 1)
+#define EVG_OPT_RENDER_TARGET   (1 << 2)
+#define EVG_OPT_DUMMY           (1 << 3)
+
+#define EVG_CLEAR_COLOR         (1 << 0)
+#define EVG_CLEAR_DEPTH         (1 << 1)
+#define EVG_CLEAR_STENCIL       (1 << 2)
+
+#define EVG_FLIP_U              (1 << 0)
+#define EVG_FLIP_V              (2 << 1)
 
 typedef struct {
 #if defined(__linux__)
@@ -63,15 +69,15 @@ typedef struct {
 #elif defined(__APPLE__)
 #elif defined(_WIN32)
 #endif
-} egWindow;
+} evgWindow;
 
 typedef struct {
-    egWindow window;
+    evgWindow window;
     uint32_t width;
     uint32_t height;
     uint32_t nbuffers;
-    egColorFormat color_format;
-    egZstencilFormat zstencil_format;
+    evgColorFormat color_format;
+    evgZstencilFormat zstencil_format;
     uint32_t adapter;
 } evgSwapSetup;
 
@@ -98,7 +104,7 @@ typedef enum {
     EVG_UNIFORM_INT4,
     EVG_UNIFORM_MAT4X4,
     EVG_UNIFORM_TEXTURE
-} evgValueType;
+} evgUniformType;
 
 typedef enum {
     EVG_SHADER_VERTEX,
@@ -114,13 +120,13 @@ typedef enum {
  */
 typedef struct {
     evgTextureType type;    // type of texture (required all)
-    egColorFormat format;   // color format to use (required all)
-    uint32_t levels;        // levels to use
+    evgColorFormat format;  // color format to use (required all)
+    uint32_t levels;        // number of levels to use
     uint32_t flags;         // flags see EVG_TEXTURE_** flags enum
     uint32_t width, height; // width and height (not used for Cube textures)
     uint32_t depth;         // texture depth (required 3d only)
     uint32_t size;          // texture size (required cube only)
-} evgTextureSetup;
+} evgTextureInfo;
 
 typedef struct {
     size_t width;
@@ -244,38 +250,37 @@ typedef struct {
 } evgProgramInterface;
 
 typedef struct {
-    uint32_t size;
-    uint32_t flags;
-} evgIndexArraySetup;
-
-typedef struct {
-    evgHandle (*create) (evgHandle device, uint32_t size, uint32_t flags);
-    void (*destroy) (evgHandle handle);
-    void (*fill_setup) (evgHandle array, evgIndexArraySetup* setup);
-    void (*update) (evgHandle array, void* data);
-} evgIndexBufferInterface;
-
-typedef struct {
     evgHandle (*create) (evgHandle device, evgShaderType type);
     void (*destroy) (evgHandle handle);
     bool (*parse) (evgHandle shader, const char* program);
     void (*add_attribute) (evgHandle shader, const char* name, evgAttributeType type, uint32_t index);
-    void (*add_uniform) (evgHandle shader, evgValueType value_type);
+    void (*add_uniform) (evgHandle shader, evgUniformType value_type);
 } evgShaderInterface;
 
 typedef struct {
-    evgHandle (*create) (evgHandle device, const evgTextureSetup* setup, const uint8_t** data);
+    evgHandle (*create) (evgHandle device, const evgTextureInfo* setup);
     void (*destroy) (evgHandle tex);
-    void (*fill_setup) (evgHandle tex, evgTextureSetup* setup);
-    void (*map) (evgHandle tex);
+    void (*fill_info) (evgHandle tex, evgTextureInfo* setup);
+    void (*update) (evgHandle tex, const uint8_t* data);
 } evgTextureInterface;
 
+typedef enum {
+    EVG_BUFFER_ARRAY,
+    EVG_BUFFER_INDEX
+} evgBufferType;
+
 typedef struct {
-    evgHandle (*create) (evgHandle device, evgVertexData* data, uint32_t flags);
-    void (*destroy) (evgHandle vbuf);
-    evgVertexData* (*data) (evgHandle vbuf);
-    void (*flush) (evgHandle vbuf);
-} evgVertexBufferInterface;
+    evgBufferType type;     // the type of buffer.
+    uint32_t size;          // actual used size in bytes
+    uint32_t capacity;      // available capacity in bytes
+} evgBufferInfo;
+
+typedef struct {
+    evgHandle (*create) (evgHandle device, evgBufferType type, uint32_t capacity, uint32_t flags);
+    void (*destroy) (evgHandle buffer);
+    void (*fill_info) (evgHandle buffer, evgBufferInfo* info);
+    void (*update) (evgHandle buffer, uint32_t size, const void* data);
+} evgBufferInterface;
 
 //=============================================================================
 typedef struct {
@@ -289,8 +294,11 @@ typedef struct {
     void (*clear_context) (evgHandle device);
 
     void (*viewport) (evgHandle device, int x, int y, int width, int height);
+    void (*clear)(evgHandle device, uint32_t clear_flags, uint32_t color, double depth, int stencil);
+
     void (*ortho) (evgHandle, float left, float right, float top, float bottom, float near, float far);
-    void (*draw) (evgHandle device, egDrawMode mode, uint32_t start, uint32_t nverts);
+    void (*draw) (evgHandle device, evgDrawMode mode, uint32_t start, uint32_t nverts);
+    
     void (*present) (evgHandle device);
     void (*flush) (evgHandle device);
 
@@ -298,12 +306,11 @@ typedef struct {
     void (*load_program) (evgHandle device, evgHandle program);
     void (*load_shader) (evgHandle device, evgHandle shader);
     void (*load_swap) (evgHandle device, evgHandle swap);
-    void (*load_texture) (evgHandle device, evgHandle texture, int index);
+    void (*load_texture) (evgHandle device, evgHandle texture, int unit);
     void (*load_vertex_buffer) (evgHandle device, evgHandle vbuf);
 
-    const evgSwapInterface* swap;    
-    const evgIndexBufferInterface* index_buffer;
-    const evgVertexBufferInterface* vertex_buffer;
+    const evgSwapInterface* swap;
+    const evgBufferInterface* buffer;
     const evgTextureInterface* texture;
     const evgShaderInterface* shader;
     const evgProgramInterface* program;
@@ -315,11 +322,18 @@ inline static bool evg_descriptor_valid (const evgDescriptor* desc)
     return desc != NULL &&
            desc->create != NULL &&
            desc->destroy != NULL && 
+
            desc->enter_context != NULL && 
            desc->leave_context != NULL &&
-           desc->present != NULL &&
+           desc->clear_context != NULL &&
+
            desc->viewport != NULL &&
+           desc->clear != NULL &&
+           
            desc->ortho != NULL &&
+           desc->draw != NULL &&
+           desc->present != NULL &&
+           desc->flush != NULL &&
 
            desc->load_program != NULL &&
            desc->load_index_buffer != NULL &&
@@ -331,14 +345,14 @@ inline static bool evg_descriptor_valid (const evgDescriptor* desc)
            desc->texture != NULL &&
            desc->texture->create != NULL &&
            desc->texture->destroy != NULL &&
-           desc->texture->fill_setup != NULL &&
-        //    desc->texture_map != NULL &&
+           desc->texture->fill_info != NULL &&
+           desc->texture->update != NULL &&
 
-           desc->vertex_buffer != NULL &&
-           desc->vertex_buffer->create != NULL &&
-           desc->vertex_buffer->data != NULL &&
-           desc->vertex_buffer->destroy != NULL &&
-           desc->vertex_buffer->flush != NULL &&
+           desc->buffer != NULL &&
+           desc->buffer->create != NULL &&
+           desc->buffer->destroy != NULL &&
+           desc->buffer->fill_info != NULL &&
+           desc->buffer->update != NULL &&
 
            desc->shader != NULL &&
            desc->shader->create != NULL &&
@@ -352,13 +366,7 @@ inline static bool evg_descriptor_valid (const evgDescriptor* desc)
            
            desc->swap != NULL &&
            desc->swap->create != NULL &&
-           desc->swap->destroy != NULL &&
-
-           desc->index_buffer != NULL &&
-           desc->index_buffer->create != NULL &&
-           desc->index_buffer->destroy != NULL &&
-           desc->index_buffer->fill_setup != NULL &&
-           desc->index_buffer->update != NULL;
+           desc->swap->destroy != NULL;
     /* clang-format on */
 }
 

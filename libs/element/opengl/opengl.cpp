@@ -119,11 +119,8 @@ void Device::ortho (float left, float right, float top, float bottom, float near
 #endif
 }
 
-void Device::draw (egDrawMode _mode, uint32_t start, uint32_t nverts)
+void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
 {
-    glClearColor (0.0, 0.0, 0.0, 1.0);
-    glClear (GL_COLOR_BUFFER_BIT);
-
     const auto mode = gl::topology (_mode);
     auto vbuf = active_vertex_buffer;
     auto ibuf = active_index_buffer;
@@ -135,11 +132,22 @@ void Device::draw (egDrawMode _mode, uint32_t start, uint32_t nverts)
     if (program == nullptr)
         goto noprog;
 
-    glUseProgram (program->object());
+    if (auto tex1 = active_texture[0]) {
+        std::cerr << "activate texture\n";
+        glActiveTexture (GL_TEXTURE0);
+        tex1->bind();
+    }
+
     program->load_buffers (vbuf, ibuf);
+    glUseProgram (program->object());
+    
+    if (auto tex1 = active_texture[0]) {
+        glUniform1i (glGetUniformLocation (program->object(), "texture1"), 0);
+        check_ok ("uniform 1i");
+    }
     
     if (ibuf) {
-        glDrawElements (mode, nverts, ibuf->element_type(), ibuf->draw_offset (start));
+        glDrawElements (mode, nverts, GL_UNSIGNED_INT, 0);
     } else {
         glDrawArrays (mode, start, nverts);
     }
@@ -170,6 +178,39 @@ void Device::_flush (evgHandle dh)
 #endif
 }
 
+
+void Device::_load_program (evgHandle dh, evgHandle ph)
+{
+    (static_cast<Device*> (dh))->active_program =
+        static_cast<Program*> (ph);
+}
+
+void Device::_load_texture (evgHandle dh, evgHandle th, int unit)
+{
+    auto device  = static_cast<Device*> (dh);
+    auto texture = static_cast<Texture*> (th);
+    auto current = device->active_texture[unit];
+
+    // if (current == texture)
+    //     return;
+
+    glActiveTexture (GL_TEXTURE0 + unit);
+    if (! gl::check_ok (""))
+        return;
+    
+    device->active_texture[unit] = texture;
+
+    if (texture == nullptr)
+        return;
+    if (! texture->bind()) {
+        std::clog << "could not bind texture\n";
+    } else {
+        std::clog << "bound texture\n";
+    }
+     // if (!gl_tex_param_i(tex->gl_target, GL_TEXTURE_SRGB_DECODE_EXT, decode))
+	// 	goto fail;
+}
+
 } // namespace gl
 
 using namespace gl;
@@ -183,9 +224,12 @@ struct OpenGL {
         : vgdesc (Device::create, Device::destroy)
     {
         vgdesc.viewport = Device::_viewport;
+        vgdesc.clear = Device::_clear;
+        
         vgdesc.ortho = Device::_ortho;
         vgdesc.draw = Device::_draw;
         vgdesc.present = Device::_present;
+        vgdesc.flush = Device::_flush;
 
         vgdesc.clear_context = Device::_clear_context;
         vgdesc.load_program = Device::_load_program;
@@ -196,8 +240,7 @@ struct OpenGL {
         vgdesc.load_vertex_buffer = Device::_load_vertex_buffer;
 
         vgdesc.texture = Texture::interface();
-        vgdesc.index_buffer = IndexBuffer::interface();
-        vgdesc.vertex_buffer = VertexBuffer::interface();
+        vgdesc.buffer = Buffer::interface();
         vgdesc.shader = Shader::interface();
         vgdesc.program = Program::interface();
         vgdesc.swap = SwapChain::interface();

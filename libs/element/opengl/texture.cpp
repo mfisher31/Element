@@ -1,10 +1,10 @@
 
-#include "opengl.hpp"
 #include "helpers.hpp"
+#include "opengl.hpp"
 
 namespace gl {
 
-evgHandle Texture::_create (evgHandle dh, const evgTextureSetup* setup, const uint8_t** data)
+evgHandle Texture::_create (evgHandle dh, const evgTextureInfo* setup)
 {
     if (nullptr == dh)
         return nullptr;
@@ -27,8 +27,7 @@ evgHandle Texture::_create (evgHandle dh, const evgTextureSetup* setup, const ui
     if (tex == nullptr)
         return nullptr;
 
-    tex->upload (data);
-    return tex->has_uploaded() ? tex.release() : nullptr;
+    return tex.release();
 }
 
 void Texture::_destroy (evgHandle t)
@@ -49,10 +48,17 @@ void Texture::_destroy (evgHandle t)
     tex.reset();
 }
 
-void Texture::_fill_setup (evgHandle th, evgTextureSetup* setup)
+void Texture::_fill_info (evgHandle th, evgTextureInfo* setup)
 {
-    if (th != nullptr && setup != nullptr)
-        (static_cast<Texture*>(th))->fill_setup (setup);
+    auto tex = static_cast<Texture*> (th);
+    if (setup != nullptr)
+        memcpy (setup, &tex->_setup, sizeof (evgTextureInfo));
+}
+
+void Texture::_update (evgHandle tex, const uint8_t* data) {
+    auto texture = static_cast<Texture*> (tex);
+    const uint8_t* d2[] = { data };
+    texture->upload (&data);
 }
 
 } // namespace gl

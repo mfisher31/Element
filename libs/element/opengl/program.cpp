@@ -92,39 +92,45 @@ bool Program::delete_program()
     return res;
 }
 
-void Program::load_buffers (VertexBuffer* vb, IndexBuffer* ib)
+void Program::load_buffers (Buffer* vb, Buffer* ib)
 {
+    GLuint buffer = vb->object();
+    GLuint VAO = vb->VAO();
+    if (buffer == 0 || VAO == 0) {
+        std::cerr << "buffer and/or VAO missing\n";
+        return;
+    }
+
+    glBindVertexArray (VAO);
+    if (! gl::check_ok ("glBindVertexArray"))
+        return;
+
+    if (! gl::bind_buffer (GL_ARRAY_BUFFER, buffer))
+        return;
+    
     for (size_t i = 0; i < vs_atts.size(); ++i) {
         auto location = vs_atts[i];
-        auto type = vs_types[i];        
-        GLint width = 4;
-        GLuint buffer = 0;
-        bool success = true;
+        auto type = GL_FLOAT; //vs_types[i];
         
-        // switch (type) {
-        //     case GL_POSITION:
-                buffer = vb->get_points();
-                width = 4;
-        //     break;
-        // }
+        // FIXME:
+        // if (type != GL_FLOAT)
+        //     continue;
+        
+        GLuint size = 3;
+        GLsizei stride = sizeof(evgVec3);// + sizeof(evgVec2);
+        uintptr_t offset = 0;
 
-        if (buffer == 0) {
-            std::clog << "[opengl] program vb invalid inputs.\n";
-            return;
+        if (location == 1) {
+            size = 2;
+            offset = sizeof(evgVec3);
         }
 
-        if (! bind_buffer (GL_ARRAY_BUFFER, buffer))
-        	return;
-
-        glVertexAttribPointer (location, width, type, GL_TRUE, 0, 0);
+        bool success = true;
+        glVertexAttribPointer (location, size, type, GL_TRUE, stride, (void*)offset);
         if (! check_ok ("glVertexAttribPointer"))
         	success = false;
-
-        glEnableVertexAttribArray(location);
+        glEnableVertexAttribArray (location);
         if (! check_ok ("glEnableVertexAttribArray"))
-        	success = false;
-
-        if (! bind_buffer (GL_ARRAY_BUFFER, 0))
         	success = false;
 
         if (! success)
@@ -132,7 +138,7 @@ void Program::load_buffers (VertexBuffer* vb, IndexBuffer* ib)
     }
 
     if (ib) {
-
+        gl::bind_buffer (GL_ELEMENT_ARRAY_BUFFER, ib->object());
     }
 }
 

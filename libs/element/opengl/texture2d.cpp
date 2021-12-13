@@ -3,20 +3,22 @@
 
 namespace gl {
 
-Texture::Texture (Device& dev, const evgTextureSetup& s)
+Texture::Texture (Device& dev, const evgTextureInfo& s)
     : device (dev)
 {
-    memcpy (&_setup, &s, sizeof (evgTextureSetup));
+    memcpy (&_setup, &s, sizeof (evgTextureInfo));
     gl_format = gl::color_format (_setup.format);
     gl_format_internal = gl::color_format_internal (_setup.format);
     gl_format_type = gl::color_format_type (_setup.format);
+    gl_target = gl::texture_target (_setup.type);
+
     dynamic = (_setup.flags & EVG_OPT_DYNAMIC) != 0;
     render_target = (_setup.flags & EVG_OPT_RENDER_TARGET) != 0;
     dummy = (_setup.flags & EVG_OPT_DUMMY) != 0;
     mipmaps = (_setup.flags & EVG_OPT_USE_MIPMAPS) != 0;
 }
 
-static inline uint32_t evg_color_format_is_compressed (egColorFormat format)
+static inline uint32_t evg_color_format_is_compressed (evgColorFormat format)
 {
     switch (format) {
         default:
@@ -24,7 +26,7 @@ static inline uint32_t evg_color_format_is_compressed (egColorFormat format)
     }
     return false;
 }
-static inline uint32_t evg_color_format_bpp (egColorFormat format)
+static inline uint32_t evg_color_format_bpp (evgColorFormat format)
 {
     switch (format) {
         case EVG_COLOR_FORMAT_UNKNOWN:
@@ -72,10 +74,20 @@ bool Texture2D::bind_data (const uint8_t** data)
     if (! gl::bind_texture (GL_TEXTURE_2D, texture))
         return false;
 
-    success = gl::init_face (GL_TEXTURE_2D, gl_format_type, num_levels, gl_format, gl_format_internal, compressed, width(), height(), tex_size, &data);
+    success = gl::init_face (GL_TEXTURE_2D, gl_format_type, num_levels, gl_format, gl_format_internal, 
+                                            compressed, width(), height(), tex_size, &data);
+
+    // glTexImage2D (gl_target, num_levels - 1, GL_RGBA, width(), height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, *data);
+    if (! gl::check_ok ("tex image 2d"))
+        success = false;
 
     if (! gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, num_levels - 1))
         success = false;
+    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     if (! gl::bind_texture (GL_TEXTURE_2D, 0))
         success = false;

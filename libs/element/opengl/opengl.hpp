@@ -22,14 +22,13 @@ enum class CopyMethod {
 };
 
 using TextureType = evgTextureType;
-using TextureSetup = evgTextureSetup;
+using TextureSetup = evgTextureInfo;
 using SwapSetup = evgSwapSetup;
 
 class Program;
 class Swap;
 class SwapChain;
-class IndexBuffer;
-class VertexBuffer;
+class Buffer;
 class Texture;
 class Shader;
 
@@ -71,9 +70,10 @@ public:
     inline bool have_platform() const noexcept { return platform != nullptr; }
     inline void enter_context() { platform->enter_context(); }
     inline void leave_context() { platform->leave_context(); }
+    
     void viewport (int x, int y, int width, int height);
     void ortho (float left, float right, float top, float bottom, float near, float far);
-    void draw (egDrawMode mode, uint32_t start, uint32_t nverts);
+    void draw (evgDrawMode mode, uint32_t start, uint32_t nverts);
 
     CopyMethod copy_method() const noexcept { return m_copy_method; }
 
@@ -89,6 +89,49 @@ public:
         (static_cast<Device*> (dh))->viewport (x, y, w, h);
     }
 
+    inline static void _clear (evgHandle device, 
+                               uint32_t  clear_flags, 
+                               uint32_t  color, 
+                               double    depth, 
+                               int       stencil) 
+    {
+        struct PixelARGB {
+            uint8_t a, r, g, b;
+        };
+
+        struct PixelRGBA {
+            uint8_t r, g, b, a;
+        };
+
+        union ConvertPixel {
+            PixelARGB pixel;
+            uint32_t packed;
+        };
+
+        GLbitfield bits = 0;
+        if ((clear_flags & EVG_CLEAR_COLOR) != 0) {
+            ConvertPixel C; C.packed = color;
+            float r = C.pixel.r / 255.f;
+            float g = C.pixel.g / 255.f;
+            float b = C.pixel.b / 255.f;
+            float a = C.pixel.a / 255.f;
+            glClearColor (r, g, b, a);
+            bits |= GL_COLOR_BUFFER_BIT;
+        }
+
+        if ((clear_flags & EVG_CLEAR_DEPTH) != 0) {
+            glClearDepth (depth);
+            bits |= GL_DEPTH_BUFFER_BIT;
+        }
+
+        if ((clear_flags & EVG_CLEAR_STENCIL) != 0) {
+            glClearStencil ((GLint) stencil);
+            bits |= GL_STENCIL_BUFFER_BIT;
+        }
+
+        glClear (bits);
+    }
+
     inline static void _ortho (evgHandle dh,
                                float left, float right,
                                float top, float bottom,
@@ -97,7 +140,7 @@ public:
         (static_cast<Device*> (dh))->ortho (left, right, top, bottom, near, far);
     }
 
-    inline static void _draw (evgHandle dh, egDrawMode mode, uint32_t start, uint32_t nverts)
+    inline static void _draw (evgHandle dh, evgDrawMode mode, uint32_t start, uint32_t nverts)
     {
         (static_cast<Device*> (dh))->draw (mode, start, nverts);
     }
@@ -114,14 +157,10 @@ public:
     inline static void _load_index_buffer (evgHandle dh, evgHandle ibh)
     {
         (static_cast<Device*> (dh))->active_index_buffer =
-            static_cast<IndexBuffer*> (ibh);
+            static_cast<Buffer*> (ibh);
     }
 
-    inline static void _load_program (evgHandle dh, evgHandle ph)
-    {
-        (static_cast<Device*> (dh))->active_program =
-            static_cast<Program*> (ph);
-    }
+    static void _load_program (evgHandle dh, evgHandle ph);
 
     inline static void _load_shader (evgHandle dh, evgHandle sh)
     {
@@ -134,24 +173,22 @@ public:
         (static_cast<Device*> (dh))->platform->load_swap (static_cast<const SwapChain*> (sh));
     }
 
-    inline static void _load_texture (evgHandle dh, evgHandle sh, int index)
-    {
-        // gl::unused (device, tex, unit);
-    }
+    static void _load_texture (evgHandle dh, evgHandle th, int unit);
 
     inline static void _load_vertex_buffer (evgHandle dh, evgHandle vbh)
     {
         (static_cast<Device*> (dh))->active_vertex_buffer =
-            static_cast<VertexBuffer*> (vbh);
+            static_cast<Buffer*> (vbh);
     }
 
 private:
     CopyMethod m_copy_method;
     evgMatrix4 active_projection;
-    IndexBuffer* active_index_buffer { nullptr };
-    VertexBuffer* active_vertex_buffer { nullptr };
+    Buffer* active_index_buffer { nullptr };
+    Buffer* active_vertex_buffer { nullptr };
     Program* active_program { nullptr };
     Swap* active_swap { nullptr };
+    Texture* active_texture[8];
 
     bool setup_extensions();
     EL_DISABLE_COPY (Device);
@@ -197,21 +234,20 @@ public:
         assert (data != nullptr);
         uploaded = upload_data (data);
     }
-
-    inline void fill_setup (TextureSetup* setup) const noexcept
-    {
-        if (setup != nullptr)
-            memcpy (setup, &_setup, sizeof (TextureSetup));
+    
+    inline bool bind() const noexcept {
+        glBindTexture (gl_target, texture);
+        return glGetError() == GL_NO_ERROR;
     }
 
-    inline TextureType type() const noexcept { return _setup.type; }
-    inline egColorFormat format() const noexcept { return _setup.format; }
+    inline evgTextureType type()   const noexcept { return _setup.type; }
+    inline evgColorFormat format() const noexcept { return _setup.format; }
 
     // inline uint32_t levels() const noexcept { return _setup.levels; }
-    inline uint32_t width() const noexcept { return _setup.width; }
+    inline uint32_t width()  const noexcept { return _setup.width; }
     inline uint32_t height() const noexcept { return _setup.height; }
-    inline uint32_t depth() const noexcept { return _setup.depth; }
-    inline uint32_t size() const noexcept { return _setup.size; }
+    inline uint32_t depth()  const noexcept { return _setup.depth; }
+    inline uint32_t size()   const noexcept { return _setup.size; }
 
     inline bool has_uploaded() const noexcept { return uploaded; }
     inline bool is_a (TextureType type) const noexcept { return _setup.type == type; }
@@ -225,14 +261,11 @@ public:
         static const evgTextureInterface I = {
             .create = _create,
             .destroy = _destroy,
-            .fill_setup = _fill_setup
+            .fill_info = _fill_info,
+            .update = _update
         };
         return &I;
     }
-
-    static evgHandle _create (evgHandle dh, const evgTextureSetup* setup, const uint8_t** data);
-    static void _destroy (evgHandle t);
-    static void _fill_setup (evgHandle tex, evgTextureSetup* setup);
 
 protected:
     explicit Texture (Device& dev, const TextureSetup& setup);
@@ -257,12 +290,20 @@ protected:
     void* fbo { nullptr };
 
     bool uploaded = false;
+
+    static evgHandle _create (evgHandle dh, const evgTextureInfo* setup);
+    static void _destroy (evgHandle t);
+    static void _fill_info (evgHandle tex, evgTextureInfo* setup);
+    static void _update (evgHandle tex, const uint8_t* data);
+
     EL_DISABLE_COPY (Texture);
 };
 
 struct Texture2D : public Texture {
     explicit Texture2D (Device& device, const TextureSetup& setup)
-        : Texture (device, setup) {}
+        : Texture (device, setup) {
+
+        }
 
 protected:
     bool upload_data (const uint8_t** data);
@@ -273,147 +314,62 @@ private:
     EL_DISABLE_COPY (Texture2D);
 };
 
-struct IndexBuffer {
-    IndexBuffer() = delete;
-    explicit IndexBuffer (uint32_t size, uint32_t flags);
+struct Buffer {
+    
+    ~Buffer();
 
-    bool is_dynamic() const noexcept { return dynamic; }
-    uint32_t object() const noexcept { return eao; }
-
-    inline uint32_t element_type() const noexcept
-    {
-        return GL_UNSIGNED_INT;
-    }
-
-    inline const void* draw_offset (uint32_t start) const noexcept
-    {
-        return (const void*) (start * sizeof (uint32_t));
-    }
-
-    void update (void* data);
+    void update (uint32_t size, const void* data);
+    bool create_buffers();
+    bool destroy_buffers();
+    inline bool is_dynamic() const noexcept { return dynamic; }
+    inline GLuint object()   const noexcept { return buffer; }
+    inline GLuint VAO() const noexcept { return vao; }
 
     //=========================================================================
-    static const evgIndexBufferInterface* interface()
+    inline static const evgBufferInterface* interface()
     {
-        static const evgIndexBufferInterface I = {
-            .create = _create,
+        static const evgBufferInterface I = {
+            .create  = _create,
             .destroy = _destroy,
-            .fill_setup = _fill_setup,
-            .update = _update
+            .fill_info = _fill_info,
+            .update  = _update
         };
         return &I;
     }
 
-private:
-    GLuint eao { 0 };
-    bool dynamic = false;
-    evgIndexArraySetup setup;
-
-    static evgHandle _create (evgHandle /*dev*/, uint32_t size, uint32_t flags)
+    inline static evgHandle _create (evgHandle device, evgBufferType type, uint32_t capacity, uint32_t flags)
     {
-        return new IndexBuffer (size, flags);
-    }
-
-    static void _destroy (evgHandle handle)
-    {
-        delete static_cast<IndexBuffer*> (handle);
-    }
-
-    static void _fill_setup (evgHandle array, evgIndexArraySetup* setup)
-    {
-        auto self = static_cast<IndexBuffer*> (array);
-        memcpy (setup, &self->setup, sizeof (evgIndexArraySetup));
-    }
-
-    static void _update (evgHandle array, void* data)
-    {
-        (static_cast<IndexBuffer*> (array))->update (data);
-    }
-};
-
-struct VertexBuffer {
-    explicit VertexBuffer (evgVertexData* data, uint32_t flags);
-
-    ~VertexBuffer()
-    {
-        // if (data != nullptr) {
-        //     evg_vertex_data_free (data);
-        //     data = nullptr;
-        // }
-    }
-
-    bool create_buffers();
-    void flush();
-    bool destroy_buffers();
-
-    inline size_t size() const noexcept { return num_vectors; }
-    inline bool is_dynamic() const noexcept { return dynamic; }
-    inline evgVertexData* get_data() const noexcept { return data; }
-
-    inline GLuint get_points() const noexcept { return points; }
-
-    inline static const evgVertexBufferInterface* interface()
-    {
-        static const evgVertexBufferInterface I = {
-            .create = _create,
-            .destroy = _destroy,
-            .data = _data,
-            .flush = _flush
-        };
-        return &I;
-    }
-
-    inline static evgHandle _create (evgHandle device,
-                                     evgVertexData* data,
-                                     uint32_t flags)
-    {
-        auto vbuf = std::make_unique<VertexBuffer> (data, flags);
-        if (! vbuf->create_buffers()) {
-            printf ("[opengl] failed to create vertex buffer\n");
-            return nullptr;
-        }
-        return vbuf.release();
+        if (auto buffer = std::unique_ptr<Buffer> (new Buffer (type, capacity, flags)))
+            if (buffer->create_buffers())
+                return buffer.release();
         return nullptr;
     }
 
-    inline static void _destroy (evgHandle v)
+    inline static void _destroy (evgHandle bh)
     {
-        if (auto vbuf = static_cast<VertexBuffer*> (v)) {
-            vbuf->destroy_buffers();
-            delete vbuf;
-        }
+        auto buffer = static_cast<Buffer*> (bh);
+        buffer->destroy_buffers();
+        delete buffer;
     }
 
-    inline static evgVertexData* _data (evgHandle v)
-    {
-        auto vbuf = (VertexBuffer*) v;
-        return vbuf != nullptr ? vbuf->get_data() : nullptr;
+    inline static void _fill_info (evgHandle bh, evgBufferInfo* info) {
+        auto buffer = static_cast<Buffer*> (bh);
+        memcpy (info, &buffer->info, sizeof (evgBufferInfo));
     }
 
-    inline static void _flush (evgHandle v)
+    inline static void _update (evgHandle bh, uint32_t size, const void* data)
     {
-        auto vbuf = (VertexBuffer*) v;
-        vbuf != nullptr ? vbuf->flush() : void();
+        auto buffer = static_cast<Buffer*> (bh);
+        buffer->update (size, data);
     }
 
 private:
-    size_t num_vectors = 0;
+    explicit Buffer (evgBufferType type, uint32_t size, uint32_t flags);
+    evgBufferInfo info;
     bool dynamic = false;
     GLuint vao { 0 },
-        points { 0 },
-        normals { 0 },
-        tangents { 0 },
-        colors { 0 };
-    struct UVBuffer {
-        UVBuffer (GLuint b, GLuint s)
-            : buffer (b),
-              size (s) {}
-        GLuint buffer;
-        GLuint size;
-    };
-
-    std::vector<UVBuffer> uv_buffers;
-    evgVertexData* data { nullptr };
+        buffer { 0 },
+        target { 0 };
 };
 
 class Shader final {
@@ -428,7 +384,7 @@ public:
 
     struct Attribute {
         Attribute (const std::string& n, evgAttributeType t, uint32_t i)
-            : index (i), type (t), name (n) {}
+            : index (i), type (t), name (n) { }
 
         std::string name;
         evgAttributeType type;
@@ -481,7 +437,7 @@ public:
         (static_cast<Shader*> (sh))->atts.push_back ({ name, type, index });
     }
 
-    inline static void _add_uniform (evgHandle sh, evgValueType vtype)
+    inline static void _add_uniform (evgHandle sh, evgUniformType vtype)
     {
         // (static_cast<Shader*>(sh))->unis.push_back ({index, type, name});
     }
@@ -499,11 +455,10 @@ public:
     ~Program();
 
     bool link (Shader* vs, Shader* fs);
-
     inline GLuint object() const noexcept { return gl_program; }
     inline bool have_program() const noexcept { return gl_program > 0; }
     inline bool can_run() const noexcept { return have_program() && gl_vert != 0 && gl_frag != 0; }
-    void load_buffers (VertexBuffer* vb, IndexBuffer* ib);
+    void load_buffers (Buffer* vb, Buffer* ib);
 
     bool create_program();
     bool delete_program();

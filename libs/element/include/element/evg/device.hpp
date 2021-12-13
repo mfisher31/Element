@@ -9,41 +9,8 @@
 
 namespace evg {
 
-#if 0
-class Shader;
-class Swap;
-class Program;
-class Texture;
-
-class Device {
-public:
-    virtual ~Device() = default;
-    virtual Swap* create_swap() = 0;
-    virtual Texture* create_texture() = 0;
-    virtual Shader* create_shader (evgShaderType type) = 0;
-    virtual Program* create_program() = 0;
-
-    virtual void load_texture (Texture*) = 0;
-    virtual void load_swap (Swap* swap) = 0;
-    virtual void load_program (Program* program) = 0;
-
-    virtual void enter_context() = 0;
-    virtual void leave_context() = 0;
-
-    virtual void viewport (int x, int y, int width, int height) = 0;
-    virtual void ortho (float left, float right, float top, float bottom, float near, float far) = 0;
-
-protected:
-    Device() = default;
-
-private:
-    EL_DISABLE_COPY(Device);
-};
-
-#else
-
+using TextureInfo = evgTextureInfo;
 using TextureType = evgTextureType;
-using TextureSetup = evgTextureSetup;
 
 template <typename Ctype>
 class Interface {
@@ -70,7 +37,7 @@ using ProgramInterface = Interface<evgProgramInterface>;
 using ShaderInterface = Interface<evgShaderInterface>;
 using SwapInterface = Interface<evgSwapInterface>;
 using TextureInterface = Interface<evgTextureInterface>;
-using VertexBufferInterface = Interface<evgVertexBufferInterface>;
+using BufferInterface = Interface<evgBufferInterface>;
 
 //=============================================================================
 class Swap final : private SwapInterface {
@@ -91,86 +58,78 @@ class Texture final : private TextureInterface {
 public:
     ~Texture() {}
 
-    TextureType type() const noexcept { return info.type; }
-    bool is_2d() const noexcept { return info.type == EVG_TEXTURE_2D; }
-    bool is_3d() const noexcept { return info.type == EVG_TEXTURE_3D; }
-    bool is_cube() const noexcept { return info.type == EVG_TEXTURE_CUBE; }
+    inline TextureType type() const noexcept { return info.type; }
+    inline bool is_2d() const noexcept { return info.type == EVG_TEXTURE_2D; }
+    inline bool is_3d() const noexcept { return info.type == EVG_TEXTURE_3D; }
+    inline bool is_cube() const noexcept { return info.type == EVG_TEXTURE_CUBE; }
 
-    uint32_t width() const noexcept  { return info.width; }
-    uint32_t height() const noexcept { return info.height; }
-    uint32_t depth() const noexcept  { return info.depth; }
+    inline uint32_t width() const noexcept  { return info.width; }
+    inline uint32_t height() const noexcept { return info.height; }
+    inline uint32_t depth() const noexcept  { return info.depth; }
+
+    inline void update (const uint8_t* data) {
+        iface.update (handle, data);
+    }
 
 private:
     friend class Device;
-    explicit Texture (const evgTextureInterface*  i, evgHandle h)
+    explicit Texture (const evgTextureInterface* i, evgHandle h)
         : TextureInterface (i, h)
     {
-       iface.fill_setup (handle, &info);
+        iface.fill_info (handle, &info);
     }
 
-    TextureSetup info;
+    TextureInfo info;
 };
 
-class IndexBuffer final {
+class Buffer final : private BufferInterface {
 public:
-    ~IndexBuffer() { destroy(); }
+    using size_type = uint32_t;
 
-    uint32_t size() const noexcept { return setup.size; }
-    void update (const void* data) noexcept
-    {
-        iface.update (handle, (void*) data);
-    }
-
-private:
-    friend class Device;
-    explicit IndexBuffer (const evgIndexBufferInterface* i, evgHandle h)
-        : handle (h)
-    {
-        memcpy (&iface, i, sizeof (evgIndexBufferInterface));
-        iface.fill_setup (handle, &setup);
-    }
-
-    void destroy()
-    {
-        if (handle == nullptr)
-            return;
-        iface.destroy (handle);
-        handle = nullptr;
-    }
-
-    evgHandle handle = nullptr;
-    evgIndexBufferInterface iface;
-    evgIndexArraySetup setup;
-};
-
-class VertexBuffer final : private VertexBufferInterface {
-public:
-    ~VertexBuffer()
+    ~Buffer()
     {
         if (handle != nullptr) {
             iface.destroy (handle);
             handle = nullptr;
         }
-        
-        if (data != nullptr) {
-            evg_vertex_data_free (data);
-            data = nullptr;
+
+        if (buffer_data != nullptr) {
+            std::free (buffer_data);
+            buffer_data = nullptr;
         }
     }
 
-    inline void update() { iface.flush (handle); }
-    inline evgVec3* points() const noexcept { return data->points; }
-    inline uint32_t size() const noexcept { return m_size; }
-    inline uint32_t num_textures() const noexcept { return m_ntex; };
+    inline bool is_array() const noexcept { return info.type == EVG_BUFFER_ARRAY; }
+    inline bool is_index() const noexcept { return info.type == EVG_BUFFER_INDEX; }
+    inline uint32_t capacity() const noexcept { return info.capacity; }
+    inline uint32_t size() const noexcept { return buffer_size; }
+    inline void flush() { iface.update (handle, buffer_size, buffer_data); }
+    inline void* data() const noexcept { return buffer_data; }
+
+    void resize (uint32_t size) {
+        if (size <= info.capacity)
+            buffer_size = size;
+        else {
+            // reallocate?
+        }
+    }
 
 private:
     friend class Device;
-    explicit VertexBuffer (const evgVertexBufferInterface* i, evgHandle h)
-        : VertexBufferInterface (i, h) {}
+    explicit Buffer (const evgBufferInterface* i, evgHandle h)
+        : BufferInterface (i, h)
+    {
+        iface.fill_info (handle, &info);
+        if (info.capacity > 0) {
+            buffer_data = std::malloc (info.capacity);
+            memset (buffer_data, 0, (size_t) info.capacity);
+            buffer_size = info.capacity;
+        }
+    }
 
-    uint32_t m_size { 0 };
-    uint32_t m_ntex { 0 };
-    evgVertexData* data = nullptr;
+    evgBufferInfo info;
+    uint32_t buffer_size = 0;
+    void* buffer_data = nullptr;
 };
 
 class Shader final : private ShaderInterface {
@@ -234,29 +193,35 @@ public:
     void clear_context();
 
     //=========================================================================
-    void load_program (Program* program) noexcept;
-    void load_index_buffer (IndexBuffer* const ib) noexcept;
-    void load_vertex_buffer (VertexBuffer* vbuf) noexcept;
-    void load_swap (const Swap* const swap) noexcept;
+    void viewport (int x, int y, int width, int height);
+    void clear (uint32_t flags, uint32_t color, double depth, int stencil);
+
+    void ortho (float left, float right, float top, float bottom, float near, float far);
+    void draw (evgDrawMode mode, uint32_t start, uint32_t count);
+    void present();
+    void flush();
 
     //=========================================================================
-    void viewport (int x, int y, int width, int height);
-    void ortho (float left, float right, float top, float bottom, float near, float far);
-    void draw (egDrawMode mode, uint32_t start, uint32_t count);
-    void present();
+    void load_program (Program* program) noexcept;
+    void load_index_buffer (Buffer* const ib) noexcept;
+    void load_vertex_buffer (Buffer* vbuf) noexcept;
+    void load_swap (const Swap* const swap) noexcept;
+    inline void load_texture (Texture* texture, int unit) noexcept {
+        desc.load_texture (device, texture != nullptr ? texture->handle: nullptr, unit);
+    }
 
     //=========================================================================
     Swap* create_swap (const evgSwapSetup* setup);
 
     //=========================================================================
-    Texture* create_2d_texture (egColorFormat format, uint32_t width, uint32_t height, const uint8_t** data);
+    Texture* create_2d_texture (evgColorFormat format, uint32_t width, uint32_t height);
     Texture* create_3d_texture() { return nullptr; }
 
     //=========================================================================
-    IndexBuffer* create_index_buffer (uint32_t size, uint32_t flags);
+    Buffer* create_index_buffer (uint32_t capacity, uint32_t flags);
 
     //=========================================================================
-    VertexBuffer* create_vertex_buffer (evgVertexData* data, uint32_t flags);
+    Buffer* create_vertex_buffer (uint32_t capacity, uint32_t flags);
 
     //=========================================================================
     Shader* create_shader (evgShaderType type);
@@ -268,9 +233,9 @@ private:
     explicit Device (const evgDescriptor* ds, evgHandle d);
     evgHandle device { nullptr };
     evgDescriptor desc;
+
     void destroy();
 };
-#endif
 
 template <class Dev>
 struct Descriptor : evgDescriptor {

@@ -1,4 +1,5 @@
 
+#if 0
 #include "opengl.hpp"
 #include "helpers.hpp"
 
@@ -16,3 +17,4 @@ void IndexBuffer::update (void* data) {
 }
 
 }
+#endif

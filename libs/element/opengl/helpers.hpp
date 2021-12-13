@@ -4,7 +4,7 @@
 
 namespace gl {
 
-static inline GLenum color_format (egColorFormat input)
+static inline GLenum color_format (evgColorFormat input)
 {
     switch (input) {
         case EVG_COLOR_FORMAT_BGRA:
@@ -20,7 +20,7 @@ static inline GLenum color_format (egColorFormat input)
     return 0;
 };
 
-static inline GLenum color_format_internal (egColorFormat input)
+static inline GLenum color_format_internal (evgColorFormat input)
 {
     switch (input) {
         case EVG_COLOR_FORMAT_BGRA:
@@ -35,7 +35,7 @@ static inline GLenum color_format_internal (egColorFormat input)
     return 0;
 };
 
-static inline GLenum color_format_type (egColorFormat input)
+static inline GLenum color_format_type (evgColorFormat input)
 {
     switch (input) {
         case EVG_COLOR_FORMAT_BGRA:
@@ -49,13 +49,22 @@ static inline GLenum color_format_type (egColorFormat input)
     return 0;
 };
 
-static inline GLenum topology (egDrawMode input) {
+static inline GLenum texture_target (evgTextureType input) {
+    switch (input) {
+        case EVG_TEXTURE_2D:    return GL_TEXTURE_2D; break;
+        case EVG_TEXTURE_3D:    return GL_TEXTURE_3D; break;
+        case EVG_TEXTURE_CUBE:  return GL_TEXTURE_CUBE_MAP; break;
+    };
+    return GL_INVALID_ENUM;
+}
+
+static inline GLenum topology (evgDrawMode input) {
     switch (input) {
         case EVG_DRAW_MODE_POINTS: return GL_POINTS;
         case EVG_DRAW_MODE_LINES: return GL_LINES;
         case EVG_DRAW_MODE_LINES_STRIP: return GL_LINE_STRIP;
         case EVG_DRAW_MODE_TRIANGLES: return GL_TRIANGLES;
-        case EVG_DRAW_MODE_TRIANGLES_STRIP: return GL_TRIANGLE_STRIP;
+        case EVG_TRIANGLE_STRIP: return GL_TRIANGLE_STRIP;
     }
     return GL_INVALID_ENUM;
 }
@@ -269,7 +278,7 @@ static inline bool get_integer_v (GLenum pname, GLint* params)
     return check_ok ("glGetIntegerv");
 }
 
-static bool init_face (GLenum target, GLenum type, uint32_t num_levels,
+static inline bool init_face (GLenum target, GLenum type, uint32_t num_levels,
                        GLenum format, GLint internal_format, bool compressed,
                        uint32_t width, uint32_t height, uint32_t size,
                        const uint8_t*** p_data)
@@ -305,6 +314,47 @@ static bool init_face (GLenum target, GLenum type, uint32_t num_levels,
     return success;
 }
 
+static inline bool init_face2 (GLenum target, GLenum type, uint32_t num_levels,
+                       GLenum format, GLint internal_format, bool compressed,
+                       uint32_t width, uint32_t height, uint32_t size,
+                       const uint8_t*** p_data)
+{
+    bool success = true;
+    const uint8_t** data = p_data ? *p_data : nullptr;
+    uint32_t i;
+
+    for (i = 0; i < num_levels; i++) {
+        if (compressed) {
+            glCompressedTexImage2D (target, i, internal_format, width, height, 0, size, data ? *data : NULL);
+            if (! gl::check_ok ("glCompressedTexImage2D"))
+                success = false;
+
+        } else {
+            glTexImage2D (target, i, internal_format, width, height, 0, format, type, data ? *data : NULL);
+            if (! gl::check_ok ("glTexImage2D"))
+                success = false;
+        }
+
+        if (data)
+            data++;
+
+        size /= 4;
+        if (width > 1)
+            width /= 2;
+        if (height > 1)
+            height /= 2;
+    }
+
+    if (data)
+        *p_data = data;
+    return success;
+}
+
+static bool buffer_data (GLenum target, GLsizeiptr size, const void* data, GLenum usage) {
+    glBufferData (target, size, data, usage);
+    return check_ok ("glBufferData");
+}
+
 // generates, binds, then sets buffer data
 static bool buffer_bind_data (GLenum target, GLuint* buffer, GLsizeiptr size,
                               const GLvoid* data, GLenum usage)
@@ -325,8 +375,10 @@ static bool buffer_bind_data (GLenum target, GLuint* buffer, GLsizeiptr size,
 
 static inline bool update_buffer (GLenum target_type, GLuint buffer, const void* data, size_t size)
 {
-    if (! bind_buffer (target_type, buffer))
+    if (! bind_buffer (target_type, buffer)) {
+        std::clog << "gl::update_buffer(" << (int)buffer << ")\n";
         return false;
+    }
 
     bool success = false;
     if (auto ptr = glMapBufferRange (target_type, 0, size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT)) {
@@ -335,7 +387,6 @@ static inline bool update_buffer (GLenum target_type, GLuint buffer, const void*
         success = check_ok ("glUnmapBuffer");
     }
 
-    bind_buffer (target_type, 0);
     return success;
 }
 
