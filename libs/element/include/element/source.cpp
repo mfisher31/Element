@@ -12,9 +12,9 @@ namespace element {
 
 static const char* vert_source = R"(
 #version 330 core
-layout (location = 0) in vec3 aPos;
+layout (location = 0) in vec3 pos;
 void main() {
-    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+    gl_Position = vec4(pos.x, pos.y, pos.z, 1.0);
 })";
 
 static const char* frag_source = R"(
@@ -22,9 +22,41 @@ static const char* frag_source = R"(
 out vec4 FragColor;
 void main() {
     FragColor = vec4 (1.0f, 0.5f, 0.2f, 1.0f);
-})";
+}
+)";
 
-inline static egColorFormat convert_stbi_color (int ncomponents)
+//============================
+
+static const char* image_vert_source = R"(
+#version 330 core
+layout (location = 0) in vec3 pos;
+layout (location = 1) in vec2 aTexCoord;
+
+out vec2 TexCoord;
+
+void main()
+{
+    gl_Position = vec4 (pos, 1.0);
+    TexCoord = vec2 (aTexCoord.x, aTexCoord.y);
+}
+)";
+
+static const char* image_frag_source = R"(
+#version 330 core
+
+out vec4 FragColor;
+in vec2 TexCoord;
+
+// texture sampler
+uniform sampler2D texture1;
+
+void main()
+{
+	FragColor = texture(texture1, TexCoord);
+}
+)";
+
+inline static evgColorFormat convert_stbi_color (int ncomponents)
 {
     switch (ncomponents) {
         case STBI_rgb:
@@ -39,7 +71,7 @@ inline static egColorFormat convert_stbi_color (int ncomponents)
 }
 
 static stbi_uc* load_image_data (const std::string& filename,
-                                 egColorFormat& format,
+                                 evgColorFormat& format,
                                  int& width,
                                  int& height)
 {
@@ -76,7 +108,7 @@ struct ImageData {
     operator const uint8_t*() const noexcept { return _data; }
 
 private:
-    egColorFormat _format { EVG_COLOR_FORMAT_UNKNOWN };
+    evgColorFormat _format { EVG_COLOR_FORMAT_UNKNOWN };
     stbi_uc* _data { nullptr };
     int _width { 0 },
         _height { 0 };
@@ -104,8 +136,11 @@ public:
             return;
 
         verts.reset (g.get_device().create_vertex_buffer (
-            evg_vertex_data_new (3, false, false, false, 0, 0),
-            EVG_OPT_DYNAMIC));
+            sizeof (evgVec3) * 3, EVG_OPT_DYNAMIC));
+
+        if (! verts) {
+            std::cerr << "array buffer failed to allocate\n";
+        }
     }
 
     void load_program (GraphicsContext& g)
@@ -115,7 +150,7 @@ public:
 
         if (program == nullptr) {
             vshader.reset (g.reserve_vertex_shader());
-            vshader->add_attribute ("aPos", EVG_ATTRIB_POSITION);
+            vshader->add_attribute ("pos", EVG_ATTRIB_POSITION);
             fshader.reset (g.reserve_fragment_shader());
             program.reset (g.reserve_program());
         }
@@ -127,21 +162,179 @@ public:
 
     void expose_triangle (GraphicsContext& g)
     {
-        auto& device = g.get_device();
+        if (! verts)
+            return;
 
-        auto pts = verts->points();
-        evg_vec3_set (pts,    -1.0f, -1.0f, 0.0);
+        auto& device = g.get_device();
+        auto pts = (evgVec3*) verts->data();
+        evg_vec3_set (pts, -1.0f, -1.0f, 0.0);
         evg_vec3_set (pts + 1, 1.0f, -1.0f, 0.0);
-        evg_vec3_set (pts + 2, 0.0f,  1.0f, 0.0);
-        verts->update();
+        evg_vec3_set (pts + 2, 0.0f, 1.0f, 0.0);
+        verts->flush();
 
         device.load_index_buffer (nullptr);
         device.load_vertex_buffer (verts.get());
         device.load_program (program.get());
-        device.draw (EVG_DRAW_MODE_TRIANGLES_STRIP, 0, 3);
+        device.draw (EVG_TRIANGLE_STRIP, 0, 3);
     }
 
-    // void expose_rectangle ()
+    //======
+    void load_square_buffers (GraphicsContext& g)
+    {
+        if (verts != nullptr)
+            return;
+
+        verts.reset (g.get_device().create_vertex_buffer (
+            sizeof (evgVec3) * 4, EVG_OPT_DYNAMIC));
+
+        index.reset (g.get_device().create_index_buffer (
+            sizeof (uint32_t) * 6, EVG_OPT_DYNAMIC));
+
+        if (! verts) {
+            std::cerr << "array buffer failed to allocate\n";
+        }
+    }
+
+    void load_square_program (GraphicsContext& g)
+    {
+        if (program_linked)
+            return;
+
+        if (program == nullptr) {
+            vshader.reset (g.reserve_vertex_shader());
+            vshader->add_attribute ("pos", EVG_ATTRIB_POSITION);
+            fshader.reset (g.reserve_fragment_shader());
+            program.reset (g.reserve_program());
+        }
+
+        if (vshader->parse (vert_source))
+            if (fshader->parse (frag_source))
+                program_linked = program->link (vshader.get(), fshader.get());
+    }
+
+    void expose_square (GraphicsContext& g)
+    {
+        if (! verts || ! index)
+            return;
+
+        auto& device = g.get_device();
+        auto pts = (evgVec3*) verts->data();
+        evg_vec3_set (pts, scale * 0.5f, scale * 0.5f, 0.0f);
+        evg_vec3_set (pts + 1, scale * 0.5f, scale * -0.5f, 0.0f);
+        evg_vec3_set (pts + 2, scale * -0.5f, scale * -0.5f, 0.0f);
+        evg_vec3_set (pts + 3, scale * -0.5f, scale * 0.5f, 0.0f);
+        verts->flush();
+
+        auto idx = (uint32_t*) index->data();
+        idx[0] = 0;
+        idx[1] = 1;
+        idx[2] = 3;
+        idx[3] = 1;
+        idx[4] = 2;
+        idx[5] = 3;
+        index->flush();
+
+        device.load_texture (nullptr, 0);
+        device.load_index_buffer (index.get());
+        device.load_vertex_buffer (verts.get());
+        device.load_program (program.get());
+        device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 6);
+    }
+
+    //=====
+    void load_image_buffers (GraphicsContext& g)
+    {
+        if (verts != nullptr)
+            return;
+
+        uint32_t vsize = sizeof (evgVec3);
+        vsize += sizeof (evgVec2);
+
+        verts.reset (g.get_device().create_vertex_buffer (
+            vsize * 4, EVG_OPT_DYNAMIC));
+
+        index.reset (g.get_device().create_index_buffer (
+            sizeof (uint32_t) * 6, EVG_OPT_DYNAMIC));
+    }
+
+    void load_image_program (GraphicsContext& g)
+    {
+        if (program_linked)
+            return;
+
+        if (program == nullptr) {
+            vshader.reset (g.reserve_vertex_shader());
+            vshader->add_attribute ("pos", EVG_ATTRIB_POSITION);
+            vshader->add_attribute ("aTexCoord", EVG_ATTRIB_TEXCOORD);
+            fshader.reset (g.reserve_fragment_shader());
+            program.reset (g.reserve_program());
+        }
+
+        if (vshader->parse (image_vert_source))
+            if (fshader->parse (image_frag_source))
+                program_linked = program->link (vshader.get(), fshader.get());
+    }
+
+    void expose_image (GraphicsContext& g)
+    {
+        if (! verts || ! index || ! texture)
+            return;
+
+        auto& device = g.get_device();
+
+        auto data = (uint8_t*) verts->data();
+
+        if (verts_changed) {
+            verts_changed = false;
+            evg_vec3_set ((evgVec3*) data, scale * 0.5f, scale * 0.5f, 0.0f);
+            data += sizeof (evgVec3);
+            evg_vec2_set ((evgVec2*) data, 1.0, 1.0);
+            data += sizeof (evgVec2);
+
+            evg_vec3_set ((evgVec3*) data, scale * 0.5f, scale * -0.5f, 0.0f);
+            data += sizeof (evgVec3);
+            evg_vec2_set ((evgVec2*) data, 1.0, 0.0);
+            data += sizeof (evgVec2);
+
+            evg_vec3_set ((evgVec3*) data, scale * -0.5f, scale * -0.5f, 0.0f);
+            data += sizeof (evgVec3);
+            evg_vec2_set ((evgVec2*) data, 0.0, 0.0);
+            data += sizeof (evgVec2);
+
+            evg_vec3_set ((evgVec3*) data, scale * -0.5f, scale * 0.5f, 0.0f);
+            data += sizeof (evgVec3);
+            evg_vec2_set ((evgVec2*) data, 0.0, 1.0);
+            data += sizeof (evgVec2);
+            verts->flush();
+
+            auto idx = (uint32_t*) index->data();
+            idx[0] = 0;
+            idx[1] = 1;
+            idx[2] = 3;
+            idx[3] = 1;
+            idx[4] = 2;
+            idx[5] = 3;
+            index->flush();
+        }
+
+        device.load_index_buffer (index.get());
+        device.load_vertex_buffer (verts.get());
+        device.load_texture (nullptr, 0);
+        device.load_texture (texture.get(), 0);
+        device.load_program (program.get());
+        device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 6);
+    }
+
+    void load_texture (GraphicsContext& gc)
+    {
+        texture.reset (gc.load_image_data (data->data(), data->format(), data->width(), data->height()));
+        if (texture) {
+            std::clog << "loaded image\n";
+        } else {
+            std::clog << "image load failed\n";
+        }
+    }
+
 private:
     friend class TestVideoSource;
     TestVideoSource& source;
@@ -149,13 +342,19 @@ private:
     std::unique_ptr<evg::Texture> texture;
     std::unique_ptr<evg::Program> program;
     std::unique_ptr<evg::Shader> vshader, fshader;
-    std::unique_ptr<evg::VertexBuffer> verts;
-    std::unique_ptr<evg::IndexBuffer> index;
+    std::unique_ptr<evg::Buffer> verts;
+    std::unique_ptr<evg::Buffer> index;
+    bool verts_changed = true;
     bool program_linked = false;
+
     int ticker = 0;
+    float scale = 1.f;
+    float interval = 0.05f;
+    float abs_interval = 0.05f;
 };
 
-TestVideoSource::TestVideoSource()
+TestVideoSource::TestVideoSource (ObjectMode m)
+    : mode (m)
 {
     impl.reset (new Impl (*this));
 }
@@ -182,35 +381,44 @@ bool TestVideoSource::load_file (const std::string& file)
 
 void TestVideoSource::process_frame()
 {
+    if (++impl->ticker == 1) {
+        if (impl->scale >= 2.f) {
+            impl->interval = impl->abs_interval * -1.0f;
+        } else if (impl->scale <= 0.5) {
+            impl->interval = impl->abs_interval * 1.0f;
+        }
+
+        impl->verts_changed = true;
+        impl->scale += impl->interval;
+        impl->ticker = 0;
+    }
 }
 
 void TestVideoSource::expose_frame (GraphicsContext& gc)
 {
-    impl->load_buffers (gc);
-    impl->load_program (gc);
-    impl->expose_triangle (gc);
-#if 0
-    if (data_changed)
-    {
-        auto& d = *impl->data;
-        if (nullptr != d.data()) {
-            if (impl->texture == nullptr) {
-                impl->texture.reset (gc.load_image_data (d, d.format(), d.width(), d.height()));
-                if (impl->texture) {
-                    std::clog << "loaded image\n";
-                } else {
-                    std::clog << "image load failed\n";
-                }
+    switch (mode) {
+        case Image: {
+            if (data_changed) {
+                impl->load_texture (gc);
+                data_changed = false;
             }
-        }
-        data_changed = false;
+            impl->load_image_buffers (gc);
+            impl->load_image_program (gc);
+            impl->expose_image (gc);
+        } break;
+
+        case Square: {
+            impl->load_square_buffers (gc);
+            impl->load_square_program (gc);
+            impl->expose_square (gc);
+        } break;
+
+        case Triangle: {
+            impl->load_buffers (gc);
+            impl->load_program (gc);
+            impl->expose_triangle (gc);
+        } break;
     }
-
-    if (! impl->texture)
-        return;
-
-    // gc.draw_sprite (impl->texture, width, height);
-#endif
 }
 
 } // namespace element

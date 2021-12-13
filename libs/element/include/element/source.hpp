@@ -9,7 +9,13 @@ namespace element {
 class GraphicsContext;
 class TestVideoSource {
 public:
-    TestVideoSource();
+    enum ObjectMode {
+        Triangle,
+        Square,
+        Image
+    };
+
+    explicit TestVideoSource (ObjectMode m = Square);
     ~TestVideoSource();
     
     bool load_file (const std::string& file);
@@ -24,6 +30,7 @@ private:
     std::mutex _render_mutex;
     bool data_changed = false;
     int width = 0, height = 0;
+    ObjectMode mode;
 };
 
 }

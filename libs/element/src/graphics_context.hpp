@@ -11,15 +11,16 @@ public:
     ~GraphicsContext();
     evg::Device& get_device() noexcept { return device; }
     
-    void draw_sprite (const evg::Texture* tex, int width, int height);
-    evg::Texture* load_image_data (const uint8_t*, egColorFormat format, int width, int height);
+    void draw_texture (const evg::Texture& texture);
+
+    evg::Texture* load_image_data (const uint8_t*, evgColorFormat format, int width, int height);
     evg::Shader*  reserve_vertex_shader();
     evg::Shader*  reserve_fragment_shader();
     evg::Program* reserve_program();
 
 private:
     evg::Device& device;
-    // std::unique_ptr<evg::VertexBuffer> sprite_buffer;
+    std::unique_ptr<evg::Buffer> sprite_buffer;
 };
 
 }

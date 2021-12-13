@@ -30,10 +30,12 @@ public:
         device.load_swap (swap.get());
         device.enter_context();
         device.viewport (0, 0, 640, 360);
+        device.clear (EVG_CLEAR_COLOR, 0xffff0000, 0.0, 0);
 
         source.expose_frame (gc);
 
         device.present();
+        device.flush();
         device.load_swap (nullptr);
         device.leave_context();
     }
