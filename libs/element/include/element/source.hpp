@@ -15,7 +15,7 @@ public:
         Image
     };
 
-    explicit TestVideoSource (ObjectMode m = Square);
+    explicit TestVideoSource (ObjectMode m = Image);
     ~TestVideoSource();
     
     bool load_file (const std::string& file);

@@ -4,6 +4,7 @@
 
 namespace gl {
 
+//==
 Buffer::Buffer (evgBufferType btype, uint32_t capacity, uint32_t flags)
 {
     info.type = btype;
@@ -29,12 +30,10 @@ Buffer::~Buffer()
 bool Buffer::create_buffers()
 {
     if (buffer != 0) {
-        std::cerr << "already have buffer\n";
         return true;
     }
 
     if (target == 0) {
-        std::cerr << "target is zero\n";
         return false;
     }
 
@@ -52,42 +51,21 @@ bool Buffer::create_buffers()
     if (! gl::bind_buffer (target, 0))
         result = false;
     
-    if (info.type == EVG_BUFFER_ARRAY)
-    {
-        if (! gl::gen_vertex_arrays (1, &vao))
-            result = false;
-    }
-
-// glBindBuffer (target, buffer);
-//     auto error = glGetError();
-//     if (error != GL_NO_ERROR) {
-//         std::clog << "glBIND BUFFER ERROR\n";
-//         std::clog << error_string (error) << " target=" << (int)target << " buffer=" << (int)buffer << std::endl;
-//         return false;
-//     }
-
     return result;
 }
 
 void Buffer::update (uint32_t size, const void* data)
 {
-    // if (info.type == EVG_BUFFER_INDEX) {
-    //     std::clog << "size=" << (int)size << std::endl;
-    //     for (int i = 0; i < 6; ++i) {
-    //         std::clog << "  val " << i << " = " << (int) ((uint32_t*)data)[i] << std::endl;
-    //     }
-    // }
     gl::update_buffer (target, buffer, data, size);
 }
 
 bool Buffer::destroy_buffers()
 {
-    if (buffer != 0)
+    if (buffer != 0) {
         glDeleteBuffers (1, &buffer);
-    if (vao != 0)
-        glDeleteVertexArrays (1, &vao);
+        buffer = 0;
+    }
 
-    buffer = vao = 0;
     return true;
 }
 

@@ -1,6 +1,7 @@
 
 #include "opengl.hpp"
 #include "helpers.hpp"
+#include "program.hpp"
 
 namespace gl {
 
@@ -13,6 +14,9 @@ Program::Program (Device& d)
 Program::~Program()
 {
     delete_program();
+    for (auto& r : ress)
+        if (r.symbol != nullptr)
+            std::free ((void*) r.symbol);
 }
 
 bool Program::link (Shader* vs, Shader* fs)
@@ -44,24 +48,60 @@ bool Program::link (Shader* vs, Shader* fs)
 
 	if (linked == GL_FALSE) {
         std::clog << "got link errors\n";
-		// print_link_errors(program->obj);
+		// TODO: log linker errors
 		return false;
 	}
 
-    for (auto const& att : vs->attributes())
+    int slot = 0, tex_slot = 0;
+    uint32_t att_key = 0, uni_key = 0;
+    for (auto const& res : vs->resources())
     {
-        GLint gl_att = glGetAttribLocation (gl_program, att.name.c_str());
-	    if (! check_ok ("glGetAttribLocation"))
-		    return false;
+        ress.push_back ({});
+        auto& res2 = ress.back();
+        res2.symbol = strdup (res.symbol.c_str());
+        res2.key = 0;
+        res2.type = res.type;
+        res2.value_type = res.value_type;
+        
+        if (res.type == EVG_ATTRIBUTE) {
+            atts.push_back (Attribute());
+            auto& att = atts.back();
+            att.location = glGetAttribLocation (gl_program, res.symbol.c_str());
+            if (! check_ok ("glGetAttribLocation"))
+                return false;
 
-	    if (gl_att == -1) {
-		    printf ("glGetAttribLocation: Could not find "
-		            "attribute '%s'", att.name.c_str());
-		    return false;
+            if (att.location == -1) {
+                printf ("glGetAttribLocation: Could not find "
+                        "attribute '%s'", res.symbol.c_str());
+                return false;
+            }
+
+            std::clog << "[opengl] programm att: " << (int)att.location << " : " << res.symbol << std::endl;
+            att.size        = uniform_vec_size (res.value_type);
+            att.type        = uniform_data_type (res.value_type);
+            att.stride      = uniform_stride (res.value_type);
+            att.normalized  = true;
+            att.offset = 0;
+            att.buffer_slot = slot++;
+            res2.key = att_key++;
+        } else if (res.type == EVG_UNIFORM) {
+            unis.push_back (Uniform());
+            auto& u = unis.back();
+            u.location = glGetUniformLocation (gl_program, res.symbol.c_str());
+            u.value_type = res.value_type;
+            u.value_size = uniform_data_size (u.value_type);
+            u.current_value.reset (new uint8_t [u.value_size]);
+            u.default_value.reset (new uint8_t [u.value_size]);
+            memset (u.current_value.get(), 0, u.value_size);
+            memset (u.default_value.get(), 0, u.value_size);
+            if (u.value_type == EVG_UNIFORM_TEXTURE) {
+                memcpy (u.current_value.get(), &tex_slot, sizeof (int));
+                memcpy (u.default_value.get(), &tex_slot, sizeof (int));
+                ++tex_slot;
+            }
+
+            res2.key = uni_key++;
         }
-        std::clog << "[opengl] programm att: " << (int)gl_att << " : " << att.name << std::endl;
-        vs_atts.push_back (gl_att);
-        vs_types.push_back (attribute_data_type (att.type));
 	}
     
     glDetachShader (gl_program, vs->object());
@@ -76,7 +116,7 @@ bool Program::create_program()
 {
     if (gl_program > 0)
         return true;
-
+    glGenVertexArrays (1, &VAO);
     gl_program = glCreateProgram();
     return check_ok ("glCreateProgram");
 }
@@ -87,58 +127,65 @@ bool Program::delete_program()
     if (gl_program) {
         glDeleteProgram (gl_program);
         gl_program = 0;
-        res = check_ok ("glDeleteProgram");
+        if (! check_ok ("glDeleteProgram"))
+            res = false;
     }
+
+    if (VAO) {
+        glDeleteVertexArrays (1, &VAO);
+        VAO = 0;
+        if (! check_ok ("Program::delete_program(): glDeleteVertexArrays()"))
+            res = false;
+    }
+
     return res;
 }
 
-void Program::load_buffers (Buffer* vb, Buffer* ib)
+void Program::load_buffers (Buffer** vb, Buffer* ib)
 {
-    GLuint buffer = vb->object();
-    GLuint VAO = vb->VAO();
-    if (buffer == 0 || VAO == 0) {
-        std::cerr << "buffer and/or VAO missing\n";
-        return;
-    }
-
     glBindVertexArray (VAO);
     if (! gl::check_ok ("glBindVertexArray"))
         return;
-
-    if (! gl::bind_buffer (GL_ARRAY_BUFFER, buffer))
-        return;
     
-    for (size_t i = 0; i < vs_atts.size(); ++i) {
-        auto location = vs_atts[i];
-        auto type = GL_FLOAT; //vs_types[i];
-        
-        // FIXME:
-        // if (type != GL_FLOAT)
-        //     continue;
-        
-        GLuint size = 3;
-        GLsizei stride = sizeof(evgVec3);// + sizeof(evgVec2);
-        uintptr_t offset = 0;
+    for (const auto& att : atts) {
+        auto buffer = vb [att.buffer_slot];
+        if (bind_buffer (GL_ARRAY_BUFFER, buffer->object()))
+        {
+            bool success = true;
+            glVertexAttribPointer (att.location, att.size, att.type, 
+                att.normalized ? GL_TRUE : GL_FALSE, 
+                att.stride, (void*)att.offset);
+            if (! check_ok ("glVertexAttribPointer"))
+                success = false;
+            glEnableVertexAttribArray (att.location);
+            if (! check_ok ("glEnableVertexAttribArray"))
+                success = false;
 
-        if (location == 1) {
-            size = 2;
-            offset = sizeof(evgVec3);
+            if (! success)
+                return;
         }
-
-        bool success = true;
-        glVertexAttribPointer (location, size, type, GL_TRUE, stride, (void*)offset);
-        if (! check_ok ("glVertexAttribPointer"))
-        	success = false;
-        glEnableVertexAttribArray (location);
-        if (! check_ok ("glEnableVertexAttribArray"))
-        	success = false;
-
-        if (! success)
-            return;
     }
 
     if (ib) {
         gl::bind_buffer (GL_ELEMENT_ARRAY_BUFFER, ib->object());
+    }
+}
+
+void Program::process_uniforms()
+{
+    for (const auto& u : unis) {
+        switch (u.value_type) {
+            case EVG_UNIFORM_TEXTURE:
+            case EVG_UNIFORM_INT:
+                glUniform1i (u.location, *(GLint*) u.current_value.get());
+                break;
+            case EVG_UNIFORM_FLOAT:
+                glUniform1f (u.location, *(GLfloat*) u.current_value.get());
+                break;
+            default: break;
+        }
+
+        check_ok ("process_uniforms: set value");
     }
 }
 
@@ -162,6 +209,11 @@ void Program::_destroy (evgHandle ph)
 void Program::_link (evgHandle ph, evgHandle vs, evgHandle fs)
 {
     (static_cast<Program*> (ph))->link ((Shader*) vs, (Shader*) fs);
+}
+
+const evgResource* Program::_resource (evgHandle ph, uint32_t index) {
+    auto& self = *static_cast<Program*> (ph);
+    return index < self.ress.size() ? &self.ress[index] : nullptr;
 }
 
 }

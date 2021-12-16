@@ -16,6 +16,11 @@ Texture::Texture (Device& dev, const evgTextureInfo& s)
     render_target = (_setup.flags & EVG_OPT_RENDER_TARGET) != 0;
     dummy = (_setup.flags & EVG_OPT_DUMMY) != 0;
     mipmaps = (_setup.flags & EVG_OPT_USE_MIPMAPS) != 0;
+
+    if (gl::gen_textures (1, &texture)) {
+        gl::bind_texture (gl_target, texture);
+        gl::bind_texture (gl_target, 0);
+    }
 }
 
 static inline uint32_t evg_color_format_is_compressed (evgColorFormat format)
@@ -83,9 +88,9 @@ bool Texture2D::bind_data (const uint8_t** data)
 
     if (! gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, num_levels - 1))
         success = false;
-    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
+    
+    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -97,8 +102,11 @@ bool Texture2D::bind_data (const uint8_t** data)
 
 bool Texture2D::upload_data (const uint8_t** data)
 {
-    if (! gl::gen_textures (1, &texture))
-        return false;
+    if (texture == 0) {
+        std::cerr << "texture not gnerated yet\n";
+        if  (! gl::gen_textures (1, &texture))
+            return false;
+    }
 
     if (! is_dummy()) {
         // if (is_dynamic() && ! create_pixel_unpack_buffer (tex))

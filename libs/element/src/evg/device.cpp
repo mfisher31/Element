@@ -43,9 +43,9 @@ void Device::load_index_buffer (Buffer* const ib) noexcept
     desc.load_index_buffer (device, ib != nullptr ? ib->handle : nullptr);
 }
 
-void Device::load_vertex_buffer (Buffer* vbuf) noexcept
+void Device::load_vertex_buffer (Buffer* vbuf, int location) noexcept
 {
-    desc.load_vertex_buffer (device, vbuf != nullptr ? vbuf->handle : nullptr);
+    desc.load_vertex_buffer (device, vbuf != nullptr ? vbuf->handle : nullptr, location);
 }
 
 void Device::load_swap (const Swap* const swap) noexcept

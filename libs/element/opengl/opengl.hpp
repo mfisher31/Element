@@ -31,6 +31,7 @@ class SwapChain;
 class Buffer;
 class Texture;
 class Shader;
+class Stencil;
 
 class Platform {
 public:
@@ -70,7 +71,7 @@ public:
     inline bool have_platform() const noexcept { return platform != nullptr; }
     inline void enter_context() { platform->enter_context(); }
     inline void leave_context() { platform->leave_context(); }
-    
+
     void viewport (int x, int y, int width, int height);
     void ortho (float left, float right, float top, float bottom, float near, float far);
     void draw (evgDrawMode mode, uint32_t start, uint32_t nverts);
@@ -89,18 +90,14 @@ public:
         (static_cast<Device*> (dh))->viewport (x, y, w, h);
     }
 
-    inline static void _clear (evgHandle device, 
-                               uint32_t  clear_flags, 
-                               uint32_t  color, 
-                               double    depth, 
-                               int       stencil) 
+    inline static void _clear (evgHandle device,
+                               uint32_t clear_flags,
+                               uint32_t color,
+                               double depth,
+                               int stencil)
     {
         struct PixelARGB {
-            uint8_t a, r, g, b;
-        };
-
-        struct PixelRGBA {
-            uint8_t r, g, b, a;
+            uint8_t b, g, r, a;
         };
 
         union ConvertPixel {
@@ -110,7 +107,8 @@ public:
 
         GLbitfield bits = 0;
         if ((clear_flags & EVG_CLEAR_COLOR) != 0) {
-            ConvertPixel C; C.packed = color;
+            ConvertPixel C;
+            C.packed = color;
             float r = C.pixel.r / 255.f;
             float g = C.pixel.g / 255.f;
             float b = C.pixel.b / 255.f;
@@ -174,20 +172,25 @@ public:
     }
 
     static void _load_texture (evgHandle dh, evgHandle th, int unit);
+    static void _load_stencil (evgHandle dh, evgHandle sh);
+    static void _load_target (evgHandle dh, evgHandle th);
 
-    inline static void _load_vertex_buffer (evgHandle dh, evgHandle vbh)
+    inline static void _load_vertex_buffer (evgHandle dh, evgHandle vbh, int location)
     {
-        (static_cast<Device*> (dh))->active_vertex_buffer =
+        (static_cast<Device*> (dh))->active_vertex_buffer[location] =
             static_cast<Buffer*> (vbh);
     }
 
 private:
     CopyMethod m_copy_method;
     evgMatrix4 active_projection;
+
     Buffer* active_index_buffer { nullptr };
-    Buffer* active_vertex_buffer { nullptr };
+    Buffer* active_vertex_buffer[8] { nullptr };
     Program* active_program { nullptr };
     Swap* active_swap { nullptr };
+    Stencil* active_stencil { nullptr };
+    Texture* active_target { nullptr };
     Texture* active_texture[8];
 
     bool setup_extensions();
@@ -229,25 +232,24 @@ public:
 
     inline void upload (const uint8_t** data)
     {
-        if (uploaded)
-            return;
         assert (data != nullptr);
         uploaded = upload_data (data);
     }
-    
-    inline bool bind() const noexcept {
+
+    inline bool bind() const noexcept
+    {
         glBindTexture (gl_target, texture);
         return glGetError() == GL_NO_ERROR;
     }
 
-    inline evgTextureType type()   const noexcept { return _setup.type; }
+    inline evgTextureType type() const noexcept { return _setup.type; }
     inline evgColorFormat format() const noexcept { return _setup.format; }
 
     // inline uint32_t levels() const noexcept { return _setup.levels; }
-    inline uint32_t width()  const noexcept { return _setup.width; }
+    inline uint32_t width() const noexcept { return _setup.width; }
     inline uint32_t height() const noexcept { return _setup.height; }
-    inline uint32_t depth()  const noexcept { return _setup.depth; }
-    inline uint32_t size()   const noexcept { return _setup.size; }
+    inline uint32_t depth() const noexcept { return _setup.depth; }
+    inline uint32_t size() const noexcept { return _setup.size; }
 
     inline bool has_uploaded() const noexcept { return uploaded; }
     inline bool is_a (TextureType type) const noexcept { return _setup.type == type; }
@@ -256,8 +258,12 @@ public:
     inline bool is_render_target() const noexcept { return render_target; }
     inline bool use_mipmaps() const noexcept { return mipmaps; }
 
+    void enable_fbo() noexcept;
+    void prepare_render (int side = 0) noexcept;
+
     //=========================================================================
-    inline static const evgTextureInterface* interface() {
+    inline static const evgTextureInterface* interface()
+    {
         static const evgTextureInterface I = {
             .create = _create,
             .destroy = _destroy,
@@ -280,14 +286,12 @@ protected:
     GLenum gl_format_internal { 0 };
     GLenum gl_format_type { 0 };
     GLenum gl_target { 0 };
+    GLuint fbo { 0 };
 
     bool dynamic { false },
         render_target { false },
         dummy { false },
         mipmaps { false };
-
-    void* active_sampler { nullptr };
-    void* fbo { nullptr };
 
     bool uploaded = false;
 
@@ -301,9 +305,9 @@ protected:
 
 struct Texture2D : public Texture {
     explicit Texture2D (Device& device, const TextureSetup& setup)
-        : Texture (device, setup) {
-
-        }
+        : Texture (device, setup)
+    {
+    }
 
 protected:
     bool upload_data (const uint8_t** data);
@@ -315,27 +319,32 @@ private:
 };
 
 struct Buffer {
-    
     ~Buffer();
 
     void update (uint32_t size, const void* data);
     bool create_buffers();
     bool destroy_buffers();
     inline bool is_dynamic() const noexcept { return dynamic; }
-    inline GLuint object()   const noexcept { return buffer; }
-    inline GLuint VAO() const noexcept { return vao; }
+    inline GLuint object() const noexcept { return buffer; }
 
     //=========================================================================
     inline static const evgBufferInterface* interface()
     {
         static const evgBufferInterface I = {
-            .create  = _create,
+            .create = _create,
             .destroy = _destroy,
             .fill_info = _fill_info,
-            .update  = _update
+            .update = _update
         };
         return &I;
     }
+
+private:
+    explicit Buffer (evgBufferType type, uint32_t size, uint32_t flags);
+    evgBufferInfo info;
+    bool dynamic = false;
+    GLuint buffer { 0 },
+           target { 0 };
 
     inline static evgHandle _create (evgHandle device, evgBufferType type, uint32_t capacity, uint32_t flags)
     {
@@ -352,7 +361,8 @@ struct Buffer {
         delete buffer;
     }
 
-    inline static void _fill_info (evgHandle bh, evgBufferInfo* info) {
+    inline static void _fill_info (evgHandle bh, evgBufferInfo* info)
+    {
         auto buffer = static_cast<Buffer*> (bh);
         memcpy (info, &buffer->info, sizeof (evgBufferInfo));
     }
@@ -362,14 +372,6 @@ struct Buffer {
         auto buffer = static_cast<Buffer*> (bh);
         buffer->update (size, data);
     }
-
-private:
-    explicit Buffer (evgBufferType type, uint32_t size, uint32_t flags);
-    evgBufferInfo info;
-    bool dynamic = false;
-    GLuint vao { 0 },
-        buffer { 0 },
-        target { 0 };
 };
 
 class Shader final {
@@ -377,31 +379,22 @@ public:
     Shader (Device& d, evgShaderType t)
         : device (d), type (t)
     {
-        atts.reserve (4);
+        res.reserve (8);
     }
 
     ~Shader() {}
 
-    struct Attribute {
-        Attribute (const std::string& n, evgAttributeType t, uint32_t i)
-            : index (i), type (t), name (n) { }
-
-        std::string name;
-        evgAttributeType type;
-        uint32_t index;
-    };
-
-    struct Uniform {
-        Uniform() {}
-        std::string name;
+    struct Resource {
+        std::string symbol;
+        evgResourceType type;
+        evgValueType value_type;
     };
 
     evgShaderType get_type() const noexcept { return type; }
     GLuint object() const noexcept { return gl_shader; }
     bool parse (const char* text);
-    void release();
 
-    inline const std::vector<Attribute>& attributes() const noexcept { return atts; }
+    inline const std::vector<Resource>& resources() const noexcept { return res; }
 
     //=========================================================================
     inline static const evgShaderInterface* interface()
@@ -410,8 +403,9 @@ public:
             .create = _create,
             .destroy = _destroy,
             .parse = _parse,
-            .add_attribute = _add_attribute,
-            .add_uniform = _add_uniform
+            // .add_attribute = _add_attribute,
+            // .add_uniform = _add_uniform,
+            .add_resource = _add_resource
         };
         return &I;
     }
@@ -432,58 +426,50 @@ public:
         return (static_cast<Shader*> (sh))->parse (text);
     }
 
-    inline static void _add_attribute (evgHandle sh, const char* name, evgAttributeType type, uint32_t index)
+    inline static void _add_resource (evgHandle sh, const char* name,
+                                      evgResourceType resource,
+                                      evgValueType value_type)
     {
-        (static_cast<Shader*> (sh))->atts.push_back ({ name, type, index });
-    }
-
-    inline static void _add_uniform (evgHandle sh, evgUniformType vtype)
-    {
-        // (static_cast<Shader*>(sh))->unis.push_back ({index, type, name});
+        auto self = static_cast<Shader*> (sh);
+        self->res.push_back (Resource());
+        auto& item = self->res.back();
+        item.symbol = name;
+        item.type = resource;
+        item.value_type = value_type;
     }
 
 private:
     Device& device;
     evgShaderType type;
     GLuint gl_shader = 0;
-    std::vector<Attribute> atts;
+    std::vector<Resource> res;
 };
 
-class Program final {
+class Stencil final {
 public:
-    Program (Device& d);
-    ~Program();
+    ~Stencil() = default;
 
-    bool link (Shader* vs, Shader* fs);
-    inline GLuint object() const noexcept { return gl_program; }
-    inline bool have_program() const noexcept { return gl_program > 0; }
-    inline bool can_run() const noexcept { return have_program() && gl_vert != 0 && gl_frag != 0; }
-    void load_buffers (Buffer* vb, Buffer* ib);
-
-    bool create_program();
-    bool delete_program();
-
-    inline static const evgProgramInterface* interface()
+    inline static const evgStencilInterface* interface()
     {
-        static const evgProgramInterface I = {
+        const static evgStencilInterface I = {
             .create = _create,
-            .destroy = _destroy,
-            .link = _link
+            .destroy = _destroy
         };
         return &I;
     }
 
-private:
-    Device& device;
-    GLuint gl_vert = 0;
-    GLuint gl_frag = 0;
-    GLuint gl_program = 0;
-    std::vector<uint32_t> vs_atts;
-    std::vector<uint32_t> vs_types;
+    void prepare_render() const noexcept;
 
-    static evgHandle _create (evgHandle dh);
-    static void _destroy (evgHandle ph);
-    static void _link (evgHandle ph, evgHandle vs, evgHandle fs);
+private:
+    Stencil() = default;
+    evgStencilFormat format;
+    GLuint width, height;
+    GLuint gl_object { 0 };
+    GLenum gl_format { 0 };
+    GLenum gl_attachment { 0 };
+    bool create_buffer();
+    static evgHandle _create (evgHandle device, uint32_t width, uint32_t height, evgStencilFormat format);
+    static void _destroy (evgHandle sh);
 };
 
 } // namespace gl

@@ -30,14 +30,14 @@ void main() {
 static const char* image_vert_source = R"(
 #version 330 core
 layout (location = 0) in vec3 pos;
-layout (location = 1) in vec2 aTexCoord;
+layout (location = 1) in vec2 uv;
 
 out vec2 TexCoord;
 
 void main()
 {
     gl_Position = vec4 (pos, 1.0);
-    TexCoord = vec2 (aTexCoord.x, aTexCoord.y);
+    TexCoord = vec2 (uv.x, uv.y);
 }
 )";
 
@@ -47,14 +47,19 @@ static const char* image_frag_source = R"(
 out vec4 FragColor;
 in vec2 TexCoord;
 
-// texture sampler
-uniform sampler2D texture1;
+uniform sampler2D image;
 
 void main()
 {
-	FragColor = texture(texture1, TexCoord);
+	FragColor = texture(image, TexCoord);
 }
 )";
+
+struct Attribute {
+    uint32_t location;
+    uint32_t data_type;
+    std::string identifier;
+};
 
 inline static evgColorFormat convert_stbi_color (int ncomponents)
 {
@@ -77,6 +82,7 @@ static stbi_uc* load_image_data (const std::string& filename,
 {
     int w, h;
     int ncomponents;
+    stbi_set_flip_vertically_on_load (true);
     auto image = stbi_load (filename.c_str(), &w, &h, &ncomponents, STBI_rgb_alpha);
 
     if (image == nullptr) {
@@ -150,8 +156,11 @@ public:
 
         if (program == nullptr) {
             vshader.reset (g.reserve_vertex_shader());
-            vshader->add_attribute ("pos", EVG_ATTRIB_POSITION);
+            vshader->add_attribute ("pos", EVG_UNIFORM_VEC3);
+            vshader->add_attribute ("uv",  EVG_UNIFORM_VEC2);
+            
             fshader.reset (g.reserve_fragment_shader());
+            fshader->add_texture ("image");
             program.reset (g.reserve_program());
         }
 
@@ -173,7 +182,8 @@ public:
         verts->flush();
 
         device.load_index_buffer (nullptr);
-        device.load_vertex_buffer (verts.get());
+        device.load_vertex_buffer (verts.get(), 0);
+        device.load_vertex_buffer (uv.get(), 1);
         device.load_program (program.get());
         device.draw (EVG_TRIANGLE_STRIP, 0, 3);
     }
@@ -202,7 +212,7 @@ public:
 
         if (program == nullptr) {
             vshader.reset (g.reserve_vertex_shader());
-            vshader->add_attribute ("pos", EVG_ATTRIB_POSITION);
+            vshader->add_attribute ("pos", EVG_UNIFORM_VEC3);
             fshader.reset (g.reserve_fragment_shader());
             program.reset (g.reserve_program());
         }
@@ -236,7 +246,8 @@ public:
 
         device.load_texture (nullptr, 0);
         device.load_index_buffer (index.get());
-        device.load_vertex_buffer (verts.get());
+        device.load_vertex_buffer (verts.get(), 0);
+        device.load_vertex_buffer (uv.get(), 1);
         device.load_program (program.get());
         device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 6);
     }
@@ -247,12 +258,10 @@ public:
         if (verts != nullptr)
             return;
 
-        uint32_t vsize = sizeof (evgVec3);
-        vsize += sizeof (evgVec2);
-
         verts.reset (g.get_device().create_vertex_buffer (
-            vsize * 4, EVG_OPT_DYNAMIC));
-
+            sizeof(evgVec3) * 4, EVG_OPT_DYNAMIC));
+        uv.reset (g.get_device().create_vertex_buffer (
+            sizeof (evgVec2) * 4, EVG_OPT_DYNAMIC));
         index.reset (g.get_device().create_index_buffer (
             sizeof (uint32_t) * 6, EVG_OPT_DYNAMIC));
     }
@@ -264,70 +273,107 @@ public:
 
         if (program == nullptr) {
             vshader.reset (g.reserve_vertex_shader());
-            vshader->add_attribute ("pos", EVG_ATTRIB_POSITION);
-            vshader->add_attribute ("aTexCoord", EVG_ATTRIB_TEXCOORD);
+            vshader->add_attribute ("pos", EVG_UNIFORM_VEC3);
+            vshader->add_attribute ("uv",  EVG_UNIFORM_VEC2);
             fshader.reset (g.reserve_fragment_shader());
+            vshader->add_texture ("image");
             program.reset (g.reserve_program());
         }
 
         if (vshader->parse (image_vert_source))
             if (fshader->parse (image_frag_source))
                 program_linked = program->link (vshader.get(), fshader.get());
+
+        if (program_linked) {
+            uint32_t index = 0;
+            auto res = program->resource (index);
+            while (res != nullptr) {
+                std::clog << "Resource: " << res->symbol << " " << (int64_t)res->key << std::endl;
+                res = program->resource (++index);
+            }
+        }
+    }
+
+    void assign_rectangle (evgVec3* points) {
+        evg_vec3_set (points, scale * 0.5f, scale * 0.5f, 0.0f);
+        evg_vec3_set (points + 1, scale * 0.5f, scale * -0.5f, 0.0f);
+        evg_vec3_set (points + 2, scale * -0.5f, scale * -0.5f, 0.0f);
+        evg_vec3_set (points + 3, scale * -0.5f, scale * 0.5f, 0.0f);
+    }
+
+    void assign_rectangle (evgVec2* tc) {
+        evg_vec2_set (tc + 0,  1.0, 1.0);
+        evg_vec2_set (tc + 1,  1.0, 0.0);
+        evg_vec2_set (tc + 2,  0.0, 0.0);
+        evg_vec2_set (tc + 3,  0.0, 1.0);
+    }
+
+    void update_image_verts() {
+        auto points = (evgVec3*) verts->data();
+        assign_rectangle (points);
+        verts->flush();
+
+        assign_rectangle ((evgVec2*) uv->data());
+        // evg_vec2_set (texc, 1.0, 1.0);
+        // evg_vec2_set (texc + 1, 1.0, 0.0);
+        // evg_vec2_set (texc + 2, 0.0, 0.0);
+        // evg_vec2_set (texc + 3, 0.0, 1.0);
+        uv->flush();
+
+        auto idx = (uint32_t*) index->data();
+        idx[0] = 0;
+        idx[1] = 1;
+        idx[2] = 3;
+        idx[3] = 1;
+        idx[4] = 2;
+        idx[5] = 3;
+        index->flush();
     }
 
     void expose_image (GraphicsContext& g)
     {
-        if (! verts || ! index || ! texture)
+        if (! verts || ! index || ! texture || ! stencil)
             return;
-
-        auto& device = g.get_device();
-
-        auto data = (uint8_t*) verts->data();
 
         if (verts_changed) {
             verts_changed = false;
-            evg_vec3_set ((evgVec3*) data, scale * 0.5f, scale * 0.5f, 0.0f);
-            data += sizeof (evgVec3);
-            evg_vec2_set ((evgVec2*) data, 1.0, 1.0);
-            data += sizeof (evgVec2);
-
-            evg_vec3_set ((evgVec3*) data, scale * 0.5f, scale * -0.5f, 0.0f);
-            data += sizeof (evgVec3);
-            evg_vec2_set ((evgVec2*) data, 1.0, 0.0);
-            data += sizeof (evgVec2);
-
-            evg_vec3_set ((evgVec3*) data, scale * -0.5f, scale * -0.5f, 0.0f);
-            data += sizeof (evgVec3);
-            evg_vec2_set ((evgVec2*) data, 0.0, 0.0);
-            data += sizeof (evgVec2);
-
-            evg_vec3_set ((evgVec3*) data, scale * -0.5f, scale * 0.5f, 0.0f);
-            data += sizeof (evgVec3);
-            evg_vec2_set ((evgVec2*) data, 0.0, 1.0);
-            data += sizeof (evgVec2);
-            verts->flush();
-
-            auto idx = (uint32_t*) index->data();
-            idx[0] = 0;
-            idx[1] = 1;
-            idx[2] = 3;
-            idx[3] = 1;
-            idx[4] = 2;
-            idx[5] = 3;
-            index->flush();
+            update_image_verts();
         }
 
+        auto& device = g.get_device();
         device.load_index_buffer (index.get());
-        device.load_vertex_buffer (verts.get());
-        device.load_texture (nullptr, 0);
+        device.load_vertex_buffer (verts.get(), 0);
+        device.load_vertex_buffer (uv.get(), 1);
         device.load_texture (texture.get(), 0);
         device.load_program (program.get());
+#if 1
+        device.load_stencil (stencil.get());
+        device.load_target (target.get());
+        device.viewport (0, 0, target->width(), target->height());
         device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 6);
+
+        device.load_stencil (nullptr);
+        device.load_target (nullptr);
+        device.load_texture (target.get(), 0);
+        device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 6);
+#else
+        device.load_stencil (nullptr);
+        device.load_target (nullptr);
+        device.draw (EVG_DRAW_MODE_TRIANGLES, 0, 6);
+#endif
     }
 
     void load_texture (GraphicsContext& gc)
     {
+        if (texture)
+            return;
         texture.reset (gc.load_image_data (data->data(), data->format(), data->width(), data->height()));
+        target.reset (gc.get_device().create_2d_texture (
+            data->format(), data->width() / 2, data->height() / 2));
+        target->update (nullptr);
+        stencil.reset (gc.get_device().create_stencil (
+            data->width(), data->height(), EVG_STENCIL_24_S8));
+        
         if (texture) {
             std::clog << "loaded image\n";
         } else {
@@ -343,12 +389,16 @@ private:
     std::unique_ptr<evg::Program> program;
     std::unique_ptr<evg::Shader> vshader, fshader;
     std::unique_ptr<evg::Buffer> verts;
+    std::unique_ptr<evg::Buffer> uv;
     std::unique_ptr<evg::Buffer> index;
+    std::unique_ptr<evg::Stencil> stencil;
+    std::unique_ptr<evg::Texture> target;
     bool verts_changed = true;
     bool program_linked = false;
 
+    bool ticker_enabled = false;
     int ticker = 0;
-    float scale = 1.f;
+    float scale = 2.f;
     float interval = 0.05f;
     float abs_interval = 0.05f;
 };
@@ -381,6 +431,9 @@ bool TestVideoSource::load_file (const std::string& file)
 
 void TestVideoSource::process_frame()
 {
+    if (! impl->ticker_enabled)
+        return;
+    
     if (++impl->ticker == 1) {
         if (impl->scale >= 2.f) {
             impl->interval = impl->abs_interval * -1.0f;

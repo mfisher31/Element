@@ -3,13 +3,13 @@ import plugins
 opengl = bld (
     features = 'cxx cxxshlib',
     source = '''
-        index_buffer.cpp
+        buffer.cpp
         opengl.cpp
         program.cpp
         shader.cpp
+        stencil.cpp
         texture.cpp
         texture2d.cpp
-        vertex_buffer.cpp
     '''.split(),
     includes = [ '.', '../include', 'glad/include' ],
     name = 'EVG_OPENGL',

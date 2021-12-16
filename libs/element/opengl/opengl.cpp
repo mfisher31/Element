@@ -10,6 +10,7 @@
 #include "helpers.hpp"
 #include "opengl.hpp"
 #include "x11_glx.hpp"
+#include "program.hpp"
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
@@ -23,6 +24,10 @@ Device::Device (PlatformPtr plat)
     : platform (std::move (plat))
 {
     evg_mat4_reset (&active_projection);
+    for (int i =0; i < 8; ++i)
+        active_vertex_buffer[i] = nullptr;
+    for (int i =0; i < 8; ++i)
+        active_texture[i] = nullptr;
 }
 
 evgHandle Device::create()
@@ -122,7 +127,7 @@ void Device::ortho (float left, float right, float top, float bottom, float near
 void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
 {
     const auto mode = gl::topology (_mode);
-    auto vbuf = active_vertex_buffer;
+    auto vbuf = active_vertex_buffer[0];
     auto ibuf = active_index_buffer;
     auto program = active_program;
 
@@ -132,20 +137,26 @@ void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
     if (program == nullptr)
         goto noprog;
 
-    if (auto tex1 = active_texture[0]) {
-        std::cerr << "activate texture\n";
-        glActiveTexture (GL_TEXTURE0);
-        tex1->bind();
+    if (active_target) {
+        active_target->prepare_render();
+        if (active_stencil)
+            active_stencil->prepare_render();
+    } else {
+        glBindFramebuffer (GL_DRAW_FRAMEBUFFER, 0);
     }
 
-    program->load_buffers (vbuf, ibuf);
-    glUseProgram (program->object());
-    
-    if (auto tex1 = active_texture[0]) {
-        glUniform1i (glGetUniformLocation (program->object(), "texture1"), 0);
-        check_ok ("uniform 1i");
+    for (int i = 0; i < 8; ++i) {
+        glActiveTexture (GL_TEXTURE0 + i);
+        if (auto t = active_texture[i])
+            t->bind();
+        else
+            glBindTexture (GL_TEXTURE_2D, 0);
     }
     
+    program->load_buffers (active_vertex_buffer, ibuf);
+    glUseProgram (program->object());
+    program->process_uniforms();
+
     if (ibuf) {
         glDrawElements (mode, nverts, GL_UNSIGNED_INT, 0);
     } else {
@@ -178,7 +189,6 @@ void Device::_flush (evgHandle dh)
 #endif
 }
 
-
 void Device::_load_program (evgHandle dh, evgHandle ph)
 {
     (static_cast<Device*> (dh))->active_program =
@@ -194,21 +204,31 @@ void Device::_load_texture (evgHandle dh, evgHandle th, int unit)
     // if (current == texture)
     //     return;
 
-    glActiveTexture (GL_TEXTURE0 + unit);
-    if (! gl::check_ok (""))
-        return;
+    // glActiveTexture (GL_TEXTURE0 + unit);
+    // if (! gl::check_ok (""))
+    //     return;
     
     device->active_texture[unit] = texture;
 
-    if (texture == nullptr)
-        return;
-    if (! texture->bind()) {
-        std::clog << "could not bind texture\n";
-    } else {
-        std::clog << "bound texture\n";
-    }
-     // if (!gl_tex_param_i(tex->gl_target, GL_TEXTURE_SRGB_DECODE_EXT, decode))
+    // if (texture == nullptr)
+    //     return;
+    // if (! texture->bind()) {
+    //     std::clog << "could not bind texture\n";
+    // } else {
+    //     std::clog << "bound texture\n";
+    // }
+    // if (!gl_tex_param_i(tex->gl_target, GL_TEXTURE_SRGB_DECODE_EXT, decode))
 	// 	goto fail;
+}
+
+void Device::_load_stencil (evgHandle dh, evgHandle sh) {
+    (static_cast<Device*> (dh))->active_stencil =
+        static_cast<Stencil*> (sh);
+}
+
+void Device::_load_target (evgHandle dh, evgHandle th) {
+    (static_cast<Device*> (dh))->active_target =
+        static_cast<Texture*> (th);
 }
 
 } // namespace gl
@@ -230,20 +250,23 @@ struct OpenGL {
         vgdesc.draw = Device::_draw;
         vgdesc.present = Device::_present;
         vgdesc.flush = Device::_flush;
-
         vgdesc.clear_context = Device::_clear_context;
+        
         vgdesc.load_program = Device::_load_program;
         vgdesc.load_index_buffer = Device::_load_index_buffer;
         vgdesc.load_shader = Device::_load_shader;
         vgdesc.load_swap = Device::_load_swap;
         vgdesc.load_texture = Device::_load_texture;
         vgdesc.load_vertex_buffer = Device::_load_vertex_buffer;
+        vgdesc.load_stencil = Device::_load_stencil;
+        vgdesc.load_target = Device::_load_target;
 
         vgdesc.texture = Texture::interface();
         vgdesc.buffer = Buffer::interface();
         vgdesc.shader = Shader::interface();
         vgdesc.program = Program::interface();
         vgdesc.swap = SwapChain::interface();
+        vgdesc.stencil = Stencil::interface();
     }
 };
 

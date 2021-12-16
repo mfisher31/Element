@@ -97,7 +97,7 @@ void GraphicsContext::draw_texture (const evg::Texture& texture)
 {
 #if 0
 	float width, height;
-	struct evgVertexData *data;
+	struct evgVertexBuffer *data;
 
 	data = gs_vertexbuffer_get_data(graphics->sprite_buffer);
 	if (tex && gs_texture_is_rect(tex))
@@ -109,7 +109,7 @@ void GraphicsContext::draw_texture (const evg::Texture& texture)
     build_sprite_norm (*sprite_buffer, (float)texture.width(), (float)texture.height(), 0);
     
     sprite_buffer->flush();
-	device.load_vertex_buffer (sprite_buffer.get());
+	device.load_vertex_buffer (sprite_buffer.get(), 0);
 	device.load_index_buffer (nullptr);
 	device.draw (EVG_TRIANGLE_STRIP, 0, 0);
 }

@@ -37,31 +37,24 @@ typedef enum {
 } evgCullMode;
 
 typedef enum {
-    EVG_TEXTURE_2D,
-    EVG_TEXTURE_3D,
-    EVG_TEXTURE_CUBE
-} evgTextureType;
+    EVG_STENCIL_NONE = 0,
+    EVG_STENCIL_16,
+    EVG_STENCIL_24_S8,
+    EVG_STENCIL_32F,
+    EVG_STENCIL_32F_S8X24,
+} evgStencilFormat;
 
-typedef enum {
-    EVG_ZSTENCIL_NONE = 0,
-    EVG_ZSTENCIL_16,
-    EVG_ZSTENCIL_24_S8,
-    EVG_ZSTENCIL_32F,
-    EVG_ZSTENCIL_32F_S8X24,
-} evgZstencilFormat;
+#define EVG_OPT_USE_MIPMAPS   (1 << 0)
+#define EVG_OPT_DYNAMIC       (1 << 1)
+#define EVG_OPT_RENDER_TARGET (1 << 2)
+#define EVG_OPT_DUMMY         (1 << 3)
 
+#define EVG_CLEAR_COLOR   (1 << 0)
+#define EVG_CLEAR_DEPTH   (1 << 1)
+#define EVG_CLEAR_STENCIL (1 << 2)
 
-#define EVG_OPT_USE_MIPMAPS     (1 << 0)
-#define EVG_OPT_DYNAMIC         (1 << 1)
-#define EVG_OPT_RENDER_TARGET   (1 << 2)
-#define EVG_OPT_DUMMY           (1 << 3)
-
-#define EVG_CLEAR_COLOR         (1 << 0)
-#define EVG_CLEAR_DEPTH         (1 << 1)
-#define EVG_CLEAR_STENCIL       (1 << 2)
-
-#define EVG_FLIP_U              (1 << 0)
-#define EVG_FLIP_V              (2 << 1)
+#define EVG_FLIP_U (1 << 0)
+#define EVG_FLIP_V (1 << 1)
 
 typedef struct {
 #if defined(__linux__)
@@ -77,7 +70,7 @@ typedef struct {
     uint32_t height;
     uint32_t nbuffers;
     evgColorFormat color_format;
-    evgZstencilFormat zstencil_format;
+    evgStencilFormat zstencil_format;
     uint32_t adapter;
 } evgSwapSetup;
 
@@ -89,6 +82,21 @@ typedef enum {
     EVG_ATTRIB_TEXCOORD,
     EVG_ATTRIB_TARGET,
 } evgAttributeType;
+
+typedef enum {
+    EVG_BOOL,
+    EVG_CHAR,
+    EVG_BYTE,
+    EVG_INT,
+    EVG_UNSIGNED_INT,
+    EVG_FLOAT,
+    EVG_DOUBLE
+} evgDataType;
+
+typedef enum {
+    EVG_ATTRIBUTE,
+    EVG_UNIFORM
+} evgResourceType;
 
 typedef enum {
     EVG_UNIFORM_UNKNOWN,
@@ -104,44 +112,31 @@ typedef enum {
     EVG_UNIFORM_INT4,
     EVG_UNIFORM_MAT4X4,
     EVG_UNIFORM_TEXTURE
-} evgUniformType;
+} evgValueType;
 
 typedef enum {
     EVG_SHADER_VERTEX,
     EVG_SHADER_FRAGMENT
 } evgShaderType;
 
-/** 
- * Parameters to use when creating textures.
- * 
- * Not all fields are used for each type, but defined
- * in one struct for convenience writing new Graphics 
- * drivers.
- */
-typedef struct {
-    evgTextureType type;    // type of texture (required all)
-    evgColorFormat format;  // color format to use (required all)
-    uint32_t levels;        // number of levels to use
-    uint32_t flags;         // flags see EVG_TEXTURE_** flags enum
-    uint32_t width, height; // width and height (not used for Cube textures)
-    uint32_t depth;         // texture depth (required 3d only)
-    uint32_t size;          // texture size (required cube only)
-} evgTextureInfo;
+
+//===
 
 typedef struct {
-    size_t width;
+    uint8_t width;
     void* array;
-} evgTextureVerts;
+} evgTexCoords;
 
 typedef struct {
-    size_t size;
+    uint32_t size;
     evgVec3* points;
     evgVec3* normals;
     evgVec3* tangents;
     uint32_t* colors;
-    size_t ntextures;
-    evgTextureVerts* texdata;
-} evgVertexData;
+
+    uint32_t num_textures;
+    evgTexCoords* texcoords;
+} evgVertexBuffer;
 
 /**
  * Create and initialize Vertex data.
@@ -149,23 +144,23 @@ typedef struct {
  * Use this when registering vertex buffers with a graphics
  * device.
  * 
- * @param size Number of vectors for each initialized type.
+ * @param size Number of elements for each initialized type.
  * @param use_normals Initialze data for normals
  * @param use_tangents Initialze data for use_tangents
  * @param use_colors Initialze data for use_colors
  * @param num_textures Allocate for num textures.
  * @param texture_width Width of texture data.
- * @return evgVertexData or NULL
+ * @return evgVertexBuffer or NULL
  */
-inline static evgVertexData* evg_vertex_data_new (size_t size,
-                                                  bool use_normals,
-                                                  bool use_tangents,
-                                                  bool use_colors,
-                                                  size_t num_textures,
-                                                  size_t texture_width)
+inline static evgVertexBuffer* evg_vertex_buffer_new (uint32_t size,
+                                                      bool use_normals,
+                                                      bool use_tangents,
+                                                      bool use_colors,
+                                                      uint32_t num_textures,
+                                                      uint32_t texcoord_size)
 {
-    evgVertexData* data = (evgVertexData*) malloc (sizeof (evgVertexData));
-    memset (data, 0, sizeof (evgVertexData));
+    evgVertexBuffer* data = (evgVertexBuffer*) malloc (sizeof (evgVertexBuffer));
+    memset (data, 0, sizeof (evgVertexBuffer));
     data->size = size;
 
     if (! size) {
@@ -186,19 +181,49 @@ inline static evgVertexData* evg_vertex_data_new (size_t size,
     __initmember (colors, uint32_t);
 #undef __initmember
 
-    if (! num_textures)
+    data->num_textures = num_textures;
+    if (data->num_textures == 0)
         return data;
 
-    if (! texture_width)
-        texture_width = 2;
+    if (texcoord_size < 2)
+        texcoord_size = 2;
+    if (texcoord_size > 4)
+        texcoord_size = 4;
 
-    data->texdata = (evgTextureVerts*) malloc (num_textures * sizeof (evgTextureVerts));
-    for (size_t i = 0; i < num_textures; i++) {
-        data->texdata[i].width = texture_width;
-        data->texdata[i].array = malloc (sizeof (evgVec2) * data->size);
-        memset (data->texdata[0].array, 0, sizeof (evgVec2) * data->size);
+    uint32_t uv_size = data->num_textures * sizeof (evgTexCoords);
+    data->texcoords = (evgTexCoords*) malloc (uv_size);
+    memset (data->texcoords, 0, uv_size);
+
+    size_t vec_size = data->size;
+    switch (texcoord_size) {
+        case 2:
+            vec_size += sizeof (evgVec2);
+            break;
+        case 3:
+            vec_size += sizeof (evgVec3);
+            break;
+        case 4:
+            vec_size += sizeof (evgVec4);
+            break;
     }
+
+    for (size_t i = 0; i < data->num_textures; i++) {
+        data->texcoords[i].width = texcoord_size;
+        data->texcoords[i].array = malloc (vec_size);
+        memset (data->texcoords[0].array, 0, vec_size);
+    }
+
     return data;
+}
+
+inline static evgVec3* evg_vertex_buffer_points (const evgVertexBuffer* buffer)
+{
+    return buffer->points;
+}
+
+inline static evgVec2* evg_vertex_buffer_texcoords_vec2 (const evgVertexBuffer* buffer, int texture_index)
+{
+    return (evgVec2*) buffer->texcoords[texture_index].array;
 }
 
 /** 
@@ -206,34 +231,27 @@ inline static evgVertexData* evg_vertex_data_new (size_t size,
  * 
  * @param data Data to free. Does nothing if NULL.
  */
-inline static void evg_vertex_data_free (evgVertexData* data)
+inline static void evg_vertex_buffer_free (evgVertexBuffer* buffer)
 {
-    if (data == NULL)
+    if (buffer == NULL)
         return;
 
-    if (data->points != NULL)
-        free (data->points);
-    if (data->normals != NULL)
-        free (data->normals);
-    if (data->tangents != NULL)
-        free (data->tangents);
-    if (data->colors != NULL)
-        free (data->colors);
-    if (data->texdata != NULL) {
-        for (uint32_t i = 0; i < data->ntextures; ++i)
-            if (data->texdata[i].array != NULL)
-                free (data->texdata[i].array);
-        free (data->texdata);
+    if (buffer->points != NULL)
+        free (buffer->points);
+    if (buffer->normals != NULL)
+        free (buffer->normals);
+    if (buffer->tangents != NULL)
+        free (buffer->tangents);
+    if (buffer->colors != NULL)
+        free (buffer->colors);
+    if (buffer->texcoords != NULL) {
+        for (uint32_t i = 0; i < buffer->num_textures; ++i)
+            if (buffer->texcoords[i].array != NULL)
+                free (buffer->texcoords[i].array);
+        free (buffer->texcoords);
     }
-    free (data);
+    free (buffer);
 }
-
-typedef struct {
-    uint32_t type;
-    uint32_t length;
-    uint32_t stride;
-    void* indices;
-} evgIndexData;
 
 //=============================================================================
 typedef void* evgHandle;
@@ -243,19 +261,53 @@ typedef struct {
     void (*destroy) (evgHandle swap);
 } evgSwapInterface;
 
+//=============================================================================
 typedef struct {
-    evgHandle (*create) (evgHandle device);
-    void (*destroy) (evgHandle program);
-    void (*link) (evgHandle program, evgHandle verts, evgHandle frags);
-} evgProgramInterface;
+    const char* symbol;
+    evgResourceType type;
+    evgValueType value_type;
+    uint32_t key;
+} evgResource;
 
 typedef struct {
     evgHandle (*create) (evgHandle device, evgShaderType type);
     void (*destroy) (evgHandle handle);
     bool (*parse) (evgHandle shader, const char* program);
-    void (*add_attribute) (evgHandle shader, const char* name, evgAttributeType type, uint32_t index);
-    void (*add_uniform) (evgHandle shader, evgUniformType value_type);
+    void (*add_resource) (evgHandle shader, const char* symbol,
+                          evgResourceType resource,
+                          evgValueType value_type);
 } evgShaderInterface;
+
+typedef struct {
+    evgHandle (*create) (evgHandle device);
+    void (*destroy) (evgHandle program);
+    void (*link) (evgHandle program, evgHandle vertex_shader, evgHandle fragment_shader);
+    const evgResource* (*resource) (evgHandle program, uint32_t index);
+} evgProgramInterface;
+
+//=============================================================================
+typedef enum {
+    EVG_TEXTURE_2D,
+    EVG_TEXTURE_3D,
+    EVG_TEXTURE_CUBE
+} evgTextureType;
+
+/** 
+ * Parameters to use when creating textures.
+ * 
+ * Not all fields are used for each type, but defined
+ * in one struct for convenience writing new Graphics 
+ * drivers.
+ */
+typedef struct {
+    evgTextureType type;    // type of texture (required all)
+    evgColorFormat format;  // color format to use (required all)
+    uint32_t levels;        // number of levels to use
+    uint32_t flags;         // flags see EVG_TEXTURE_** flags enum
+    uint32_t width, height; // width and height (not used for Cube textures)
+    uint32_t depth;         // texture depth (required 3d only)
+    uint32_t size;          // texture size (required cube only)
+} evgTextureInfo;
 
 typedef struct {
     evgHandle (*create) (evgHandle device, const evgTextureInfo* setup);
@@ -264,15 +316,16 @@ typedef struct {
     void (*update) (evgHandle tex, const uint8_t* data);
 } evgTextureInterface;
 
+//=============================================================================
 typedef enum {
     EVG_BUFFER_ARRAY,
     EVG_BUFFER_INDEX
 } evgBufferType;
 
 typedef struct {
-    evgBufferType type;     // the type of buffer.
-    uint32_t size;          // actual used size in bytes
-    uint32_t capacity;      // available capacity in bytes
+    evgBufferType type; // the type of buffer.
+    uint32_t size;      // actual used size in bytes
+    uint32_t capacity;  // available capacity in bytes
 } evgBufferInfo;
 
 typedef struct {
@@ -284,6 +337,11 @@ typedef struct {
 
 //=============================================================================
 typedef struct {
+    evgHandle (*create) (evgHandle device, uint32_t width, uint32_t height, evgStencilFormat format);
+    void (*destroy) (evgHandle stencil);
+} evgStencilInterface;
+
+typedef struct {
     const char* name;
 
     evgHandle (*create)();
@@ -294,11 +352,11 @@ typedef struct {
     void (*clear_context) (evgHandle device);
 
     void (*viewport) (evgHandle device, int x, int y, int width, int height);
-    void (*clear)(evgHandle device, uint32_t clear_flags, uint32_t color, double depth, int stencil);
+    void (*clear) (evgHandle device, uint32_t clear_flags, uint32_t color, double depth, int stencil);
 
     void (*ortho) (evgHandle, float left, float right, float top, float bottom, float near, float far);
     void (*draw) (evgHandle device, evgDrawMode mode, uint32_t start, uint32_t nverts);
-    
+
     void (*present) (evgHandle device);
     void (*flush) (evgHandle device);
 
@@ -306,14 +364,17 @@ typedef struct {
     void (*load_program) (evgHandle device, evgHandle program);
     void (*load_shader) (evgHandle device, evgHandle shader);
     void (*load_swap) (evgHandle device, evgHandle swap);
-    void (*load_texture) (evgHandle device, evgHandle texture, int unit);
-    void (*load_vertex_buffer) (evgHandle device, evgHandle vbuf);
+    void (*load_texture) (evgHandle device, evgHandle texture, int slot);
+    void (*load_vertex_buffer) (evgHandle device, evgHandle vbuf, int slot);
+    void (*load_stencil) (evgHandle device, evgHandle stencil);
+    void (*load_target) (evgHandle device, evgHandle texture);
 
     const evgSwapInterface* swap;
     const evgBufferInterface* buffer;
     const evgTextureInterface* texture;
     const evgShaderInterface* shader;
     const evgProgramInterface* program;
+    const evgStencilInterface* stencil;
 } evgDescriptor;
 
 inline static bool evg_descriptor_valid (const evgDescriptor* desc)

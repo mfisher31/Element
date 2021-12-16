@@ -30,7 +30,7 @@ public:
         device.load_swap (swap.get());
         device.enter_context();
         device.viewport (0, 0, 640, 360);
-        device.clear (EVG_CLEAR_COLOR, 0xffff0000, 0.0, 0);
+        device.clear (EVG_CLEAR_COLOR, 0xff050505, 0.0, 0);
 
         source.expose_frame (gc);
 

@@ -49,22 +49,35 @@ static inline GLenum color_format_type (evgColorFormat input)
     return 0;
 };
 
-static inline GLenum texture_target (evgTextureType input) {
+static inline GLenum texture_target (evgTextureType input)
+{
     switch (input) {
-        case EVG_TEXTURE_2D:    return GL_TEXTURE_2D; break;
-        case EVG_TEXTURE_3D:    return GL_TEXTURE_3D; break;
-        case EVG_TEXTURE_CUBE:  return GL_TEXTURE_CUBE_MAP; break;
+        case EVG_TEXTURE_2D:
+            return GL_TEXTURE_2D;
+            break;
+        case EVG_TEXTURE_3D:
+            return GL_TEXTURE_3D;
+            break;
+        case EVG_TEXTURE_CUBE:
+            return GL_TEXTURE_CUBE_MAP;
+            break;
     };
-    return GL_INVALID_ENUM;
+    return 0;
 }
 
-static inline GLenum topology (evgDrawMode input) {
+static inline GLenum topology (evgDrawMode input)
+{
     switch (input) {
-        case EVG_DRAW_MODE_POINTS: return GL_POINTS;
-        case EVG_DRAW_MODE_LINES: return GL_LINES;
-        case EVG_DRAW_MODE_LINES_STRIP: return GL_LINE_STRIP;
-        case EVG_DRAW_MODE_TRIANGLES: return GL_TRIANGLES;
-        case EVG_TRIANGLE_STRIP: return GL_TRIANGLE_STRIP;
+        case EVG_DRAW_MODE_POINTS:
+            return GL_POINTS;
+        case EVG_DRAW_MODE_LINES:
+            return GL_LINES;
+        case EVG_DRAW_MODE_LINES_STRIP:
+            return GL_LINE_STRIP;
+        case EVG_DRAW_MODE_TRIANGLES:
+            return GL_TRIANGLES;
+        case EVG_TRIANGLE_STRIP:
+            return GL_TRIANGLE_STRIP;
     }
     return GL_INVALID_ENUM;
 }
@@ -82,14 +95,116 @@ static inline GLenum shader_type (evgShaderType input)
     return GL_INVALID_ENUM;
 }
 
-static inline GLenum attribute_data_type (evgAttributeType input) {
+static inline GLenum attribute_data_type (evgAttributeType input)
+{
     switch (input) {
         case EVG_ATTRIB_POSITION:
             return GL_FLOAT;
-        default: break;
+        default:
+            break;
     }
 
-    return GL_INVALID_ENUM;
+    return 0;
+}
+
+static inline GLenum uniform_vec_size (uint32_t input)
+{
+    switch (input) {
+        case EVG_UNIFORM_FLOAT:
+            return 1;
+        case EVG_UNIFORM_VEC2:
+            return 2;
+        case EVG_UNIFORM_VEC3:
+            return 3;
+        case EVG_UNIFORM_VEC4:
+            return 4;
+        case EVG_UNIFORM_MAT4X4:
+            return 4 * 4;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+static inline GLenum uniform_stride (uint32_t input)
+{
+    switch (input) {
+        case EVG_UNIFORM_FLOAT:
+            return sizeof (float);
+        case EVG_UNIFORM_VEC2:
+            return sizeof (evgVec2);
+        case EVG_UNIFORM_VEC3:
+            return sizeof (evgVec3);
+        case EVG_UNIFORM_VEC4:
+            return sizeof (evgVec4);
+        case EVG_UNIFORM_MAT4X4:
+            return sizeof (evgMatrix4);
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+static inline GLenum uniform_data_size (uint32_t input)
+{
+    return uniform_stride (input);
+}
+
+static inline GLenum uniform_data_type (uint32_t input)
+{
+    switch (input) {
+        case EVG_UNIFORM_FLOAT:
+        case EVG_UNIFORM_VEC2:
+        case EVG_UNIFORM_VEC3:
+        case EVG_UNIFORM_VEC4:
+        case EVG_UNIFORM_MAT4X4:
+            return GL_FLOAT;
+        case EVG_UNIFORM_TEXTURE:
+            return GL_TEXTURE;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+static inline GLenum stencil_format (evgStencilFormat format)
+{
+    switch (format) {
+        case EVG_STENCIL_16:
+            return GL_DEPTH_COMPONENT16;
+        case EVG_STENCIL_24_S8:
+            return GL_DEPTH24_STENCIL8;
+        case EVG_STENCIL_32F:
+            return GL_DEPTH_COMPONENT32F;
+        case EVG_STENCIL_32F_S8X24:
+            return GL_DEPTH32F_STENCIL8;
+        case EVG_STENCIL_NONE:
+            return 0;
+    }
+
+    return 0;
+}
+
+static inline GLenum stencil_attachment (evgStencilFormat format)
+{
+	switch (format) {
+
+	case EVG_STENCIL_16:
+		return GL_DEPTH_ATTACHMENT;
+	case EVG_STENCIL_24_S8:
+		return GL_DEPTH_STENCIL_ATTACHMENT;
+	case EVG_STENCIL_32F:
+		return GL_DEPTH_ATTACHMENT;
+	case EVG_STENCIL_32F_S8X24:
+		return GL_DEPTH_STENCIL_ATTACHMENT;
+	case EVG_STENCIL_NONE:
+		return 0;
+	}
+
+	return 0;
 }
 
 template <typename... Tps>
@@ -279,9 +394,9 @@ static inline bool get_integer_v (GLenum pname, GLint* params)
 }
 
 static inline bool init_face (GLenum target, GLenum type, uint32_t num_levels,
-                       GLenum format, GLint internal_format, bool compressed,
-                       uint32_t width, uint32_t height, uint32_t size,
-                       const uint8_t*** p_data)
+                              GLenum format, GLint internal_format, bool compressed,
+                              uint32_t width, uint32_t height, uint32_t size,
+                              const uint8_t*** p_data)
 {
     bool success = true;
     const uint8_t** data = p_data ? *p_data : nullptr;
@@ -315,9 +430,9 @@ static inline bool init_face (GLenum target, GLenum type, uint32_t num_levels,
 }
 
 static inline bool init_face2 (GLenum target, GLenum type, uint32_t num_levels,
-                       GLenum format, GLint internal_format, bool compressed,
-                       uint32_t width, uint32_t height, uint32_t size,
-                       const uint8_t*** p_data)
+                               GLenum format, GLint internal_format, bool compressed,
+                               uint32_t width, uint32_t height, uint32_t size,
+                               const uint8_t*** p_data)
 {
     bool success = true;
     const uint8_t** data = p_data ? *p_data : nullptr;
@@ -350,7 +465,8 @@ static inline bool init_face2 (GLenum target, GLenum type, uint32_t num_levels,
     return success;
 }
 
-static bool buffer_data (GLenum target, GLsizeiptr size, const void* data, GLenum usage) {
+static bool buffer_data (GLenum target, GLsizeiptr size, const void* data, GLenum usage)
+{
     glBufferData (target, size, data, usage);
     return check_ok ("glBufferData");
 }
@@ -376,7 +492,7 @@ static bool buffer_bind_data (GLenum target, GLuint* buffer, GLsizeiptr size,
 static inline bool update_buffer (GLenum target_type, GLuint buffer, const void* data, size_t size)
 {
     if (! bind_buffer (target_type, buffer)) {
-        std::clog << "gl::update_buffer(" << (int)buffer << ")\n";
+        std::clog << "gl::update_buffer(" << (int) buffer << ")\n";
         return false;
     }
 

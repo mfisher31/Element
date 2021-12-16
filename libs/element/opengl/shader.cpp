@@ -73,9 +73,4 @@ bool Shader::parse (const char* program)
     return success;
 }
 
-void Shader::release()
-{
-}
-
-
 } // namespace gl
