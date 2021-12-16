@@ -22,8 +22,8 @@ public:
 
     void resized()
     {
-        embed->setBounds (getLocalBounds().reduced (10));
-        // embed->centreWithSize (640, 360);
+        // embed->setBounds (getLocalBounds().reduced (10));
+        embed->centreWithSize (640, 360);
     }
 
     void paint (juce::Graphics& g)
@@ -52,7 +52,7 @@ public:
         setup.height = 360;
         setup.nbuffers = 1;
         setup.window.xwindow = embed->getHostWindowID();
-        setup.zstencil_format = EVG_ZSTENCIL_24_S8;
+        setup.zstencil_format = EVG_STENCIL_24_S8;
         return std::move (setup);
     }
 
