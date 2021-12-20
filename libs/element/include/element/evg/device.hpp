@@ -9,13 +9,19 @@
 
 namespace evg {
 
+using BufferInfo = evgBufferInfo;
+using ColorFormat = evgColorFormat;
+using DrawMode = evgDrawMode;
+using StencilFormat = evgStencilFormat;
+using SwapSetup = evgSwapSetup;
 using TextureInfo = evgTextureInfo;
 using TextureType = evgTextureType;
+using ValueType = evgValueType;
 
 template <typename Ctype>
 class Interface {
 public:
-    using primitive_type = Ctype;
+    using type = Ctype;
     ~Interface() = default;
 
 protected:
@@ -64,6 +70,7 @@ public:
     inline bool is_3d() const noexcept { return info.type == EVG_TEXTURE_3D; }
     inline bool is_cube() const noexcept { return info.type == EVG_TEXTURE_CUBE; }
 
+    inline ColorFormat color_format() const noexcept { return info.format; }
     inline uint32_t width() const noexcept { return info.width; }
     inline uint32_t height() const noexcept { return info.height; }
     inline uint32_t depth() const noexcept { return info.depth; }
@@ -130,7 +137,7 @@ private:
         }
     }
 
-    evgBufferInfo info;
+    BufferInfo info;
     uint32_t buffer_size = 0;
     void* buffer_data = nullptr;
 };
@@ -147,20 +154,24 @@ public:
 
     bool parse (const char* program) { return iface.parse (handle, program); }
 
-    void add_resource (const char* symbol, evgResourceType resource, evgValueType value_type) noexcept {
+    void add_resource (const char* symbol, evgResourceType resource, evgValueType value_type) noexcept
+    {
         iface.add_resource (handle, symbol, resource, value_type);
     }
 
-    void add_attribute (const char* symbol, evgValueType value_type) noexcept {
+    void add_attribute (const char* symbol, evgValueType value_type) noexcept
+    {
         add_resource (symbol, EVG_ATTRIBUTE, value_type);
     }
 
-    void add_uniform (const char* symbol, evgValueType value_type) noexcept {
+    void add_uniform (const char* symbol, evgValueType value_type) noexcept
+    {
         add_resource (symbol, EVG_UNIFORM, value_type);
     }
 
-    void add_texture (const char* symbol) noexcept {
-        add_uniform (symbol, EVG_UNIFORM_TEXTURE);
+    void add_texture (const char* symbol) noexcept
+    {
+        add_uniform (symbol, EVG_VALUE_TEXTURE);
     }
 
 private:
@@ -186,23 +197,58 @@ public:
         return true;
     }
 
-    const evgResource* resource (uint32_t index) const noexcept {
+    const evgResource* resource (uint32_t index) const noexcept
+    {
         return iface.resource (handle, index);
     }
-    
+
+    inline int map_symbol (const char* symbol) const noexcept
+    {
+        uint32_t i = 0;
+        auto res = resource (i);
+        while (res != nullptr) {
+            if (strcmp (res->symbol, symbol) == 0)
+                return static_cast<int> (res->key);
+            res = resource (i++);
+        }
+        return 0xffffffff;
+    }
+
+    void set_value (int key, uint32_t size, const void* data) noexcept
+    {
+        iface.update_resource (handle, key, size, data);
+    }
+
+    void set_value (const char* key, uint32_t size, const void* data) noexcept
+    {
+        auto ikey = map_symbol (key);
+        if (ikey != 0xffffffff)
+            set_value (ikey, size, data);
+    }
+
+    template <typename Val>
+    void set_value (const char* symbol, const Val& value) noexcept
+    {
+        return set_value (symbol, sizeof (Val), &value);
+    }
+
+    template <typename Val>
+    void set_value (int key, const Val& value) noexcept
+    {
+        return set_value (key, sizeof (Val), &value);
+    }
+
 private:
     friend class Device;
     explicit Program (const evgProgramInterface* i, evgHandle h)
         : ProgramInterface (i, h) {}
 };
 
-using StencilFormat = evgStencilFormat;
-
 class Stencil final : private StencilInterface {
 public:
     ~Stencil() = default;
 
-    evgStencilFormat format() const noexcept { return f; }
+    StencilFormat format() const noexcept { return f; }
     uint32_t width() const noexcept { return w; }
     uint32_t height() const noexcept { return h; }
 
@@ -227,11 +273,13 @@ public:
     void clear_context();
 
     //=========================================================================
+    void enable (uint32_t what, bool enabled);
+
+    //=========================================================================
     void viewport (int x, int y, int width, int height);
     void clear (uint32_t flags, uint32_t color, double depth, int stencil);
 
-    void ortho (float left, float right, float top, float bottom, float near, float far);
-    void draw (evgDrawMode mode, uint32_t start, uint32_t count);
+    void draw (DrawMode mode, uint32_t start, uint32_t count);
     void present();
     void flush();
 
@@ -240,21 +288,24 @@ public:
     void load_index_buffer (Buffer* const ib) noexcept;
     void load_vertex_buffer (Buffer* vbuf, int slot) noexcept;
     void load_swap (const Swap* const swap) noexcept;
+    
     inline void load_texture (Texture* texture, int unit) noexcept
     {
         desc.load_texture (device, texture != nullptr ? texture->handle : nullptr, unit);
     }
+    
     inline void load_stencil (Stencil* stencil) noexcept
     {
         desc.load_stencil (device, stencil != nullptr ? stencil->handle : nullptr);
     }
+    
     inline void load_target (Texture* texture) noexcept
     {
         desc.load_target (device, texture != nullptr ? texture->handle : nullptr);
     }
 
     //=========================================================================
-    Swap* create_swap (const evgSwapSetup* setup);
+    Swap* create_swap (const SwapSetup* setup);
 
     //=========================================================================
     Texture* create_2d_texture (evgColorFormat format, uint32_t width, uint32_t height);
@@ -272,53 +323,14 @@ public:
     //=========================================================================
     Program* create_program();
 
-    //===
-    Stencil* create_stencil (uint32_t width, uint32_t height, StencilFormat format)
-    {
-        auto iface = desc.stencil;
-        if (auto handle = iface->create (device, width, height, format)) {
-            auto st = new Stencil (iface, handle);
-            st->f = format;
-            st->w = width;
-            st->h = height;
-            return st;
-        }
-        return nullptr;
-    }
+    //=========================================================================
+    Stencil* create_stencil (uint32_t width, uint32_t height, StencilFormat format);
 
 private:
     explicit Device (const evgDescriptor* ds, evgHandle d);
     evgHandle device { nullptr };
     evgDescriptor desc;
-
     void destroy();
-};
-
-template <class Dev>
-struct Descriptor : evgDescriptor {
-    using device_type = Dev;
-    using descriptor_type = Descriptor<Dev>;
-
-    explicit inline Descriptor (evgHandle (*allocator)() = nullptr,
-                                void (*deleter) (evgHandle) = nullptr)
-    {
-        memset ((evgDescriptor*) this, 0, sizeof (evgDescriptor));
-        create = allocator;
-        destroy = deleter;
-        enter_context = _enter_context;
-        leave_context = _leave_context;
-    }
-
-private:
-    inline static void _enter_context (evgHandle dh)
-    {
-        (static_cast<Dev*> (dh))->enter_context();
-    }
-
-    inline static void _leave_context (evgHandle dh)
-    {
-        (static_cast<Dev*> (dh))->leave_context();
-    }
 };
 
 } // namespace evg

@@ -63,7 +63,7 @@ static int log_x11_error (Display* display, XErrorEvent* error)
     return 0;
 }
 
-struct GLXSwap final : public gl::SwapChain {
+struct GLXSwap final : public gl::Swap {
     xcb_window_t ID { 0 };
     GLXFBConfig config { 0 };
     int screen { -1 };
@@ -93,7 +93,7 @@ public:
     }
 
     //========================================================================
-    SwapChain* create_swap (const evgSwapSetup* setup) override
+    Swap* create_swap (const evgSwapSetup* setup) override
     {
         auto swap = std::make_unique<GLXSwap> (setup);
         if (! attach_swap (swap.get()))
@@ -101,7 +101,7 @@ public:
         return swap.release();
     }
 
-    void load_swap (const SwapChain* s) override
+    void load_swap (const Swap* s) override
     {
         auto swap = dynamic_cast<const GLXSwap*> (s);
         if (active_swap == swap)

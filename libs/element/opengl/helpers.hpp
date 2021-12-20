@@ -110,15 +110,15 @@ static inline GLenum attribute_data_type (evgAttributeType input)
 static inline GLenum uniform_vec_size (uint32_t input)
 {
     switch (input) {
-        case EVG_UNIFORM_FLOAT:
+        case EVG_VALUE_FLOAT:
             return 1;
-        case EVG_UNIFORM_VEC2:
+        case EVG_VALUE_VEC2:
             return 2;
-        case EVG_UNIFORM_VEC3:
+        case EVG_VALUE_VEC3:
             return 3;
-        case EVG_UNIFORM_VEC4:
+        case EVG_VALUE_VEC4:
             return 4;
-        case EVG_UNIFORM_MAT4X4:
+        case EVG_VALUE_MAT4X4:
             return 4 * 4;
         default:
             break;
@@ -130,15 +130,15 @@ static inline GLenum uniform_vec_size (uint32_t input)
 static inline GLenum uniform_stride (uint32_t input)
 {
     switch (input) {
-        case EVG_UNIFORM_FLOAT:
+        case EVG_VALUE_FLOAT:
             return sizeof (float);
-        case EVG_UNIFORM_VEC2:
+        case EVG_VALUE_VEC2:
             return sizeof (evgVec2);
-        case EVG_UNIFORM_VEC3:
+        case EVG_VALUE_VEC3:
             return sizeof (evgVec3);
-        case EVG_UNIFORM_VEC4:
+        case EVG_VALUE_VEC4:
             return sizeof (evgVec4);
-        case EVG_UNIFORM_MAT4X4:
+        case EVG_VALUE_MAT4X4:
             return sizeof (evgMatrix4);
         default:
             break;
@@ -155,13 +155,13 @@ static inline GLenum uniform_data_size (uint32_t input)
 static inline GLenum uniform_data_type (uint32_t input)
 {
     switch (input) {
-        case EVG_UNIFORM_FLOAT:
-        case EVG_UNIFORM_VEC2:
-        case EVG_UNIFORM_VEC3:
-        case EVG_UNIFORM_VEC4:
-        case EVG_UNIFORM_MAT4X4:
+        case EVG_VALUE_FLOAT:
+        case EVG_VALUE_VEC2:
+        case EVG_VALUE_VEC3:
+        case EVG_VALUE_VEC4:
+        case EVG_VALUE_MAT4X4:
             return GL_FLOAT;
-        case EVG_UNIFORM_TEXTURE:
+        case EVG_VALUE_TEXTURE:
             return GL_TEXTURE;
         default:
             break;

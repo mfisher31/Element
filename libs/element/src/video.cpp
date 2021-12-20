@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "element/context.hpp"
+#include "element/evg/matrix.h"
 #include "element/source.hpp"
 #include "graphics_context.hpp"
 #include "graphics_device.hpp"
@@ -17,25 +18,27 @@ struct fps_to_nanoseconds {
 using FPS30 = fps_to_nanoseconds<30>;
 using FPS60 = fps_to_nanoseconds<60>;
 using FPS24 = fps_to_nanoseconds<24>;
-using FPS5  = fps_to_nanoseconds<5>;
+using FPS5 = fps_to_nanoseconds<5>;
 
 class TestDisplay : public VideoDisplay {
 public:
     TestDisplay (TestVideoSource& s, evg::Swap* sw)
-        : source (s), swap (sw) {}
+        : source (s), swap (sw) { }
 
     void render (GraphicsContext& gc)
     {
         auto& device = gc.get_device();
         device.load_swap (swap.get());
         device.enter_context();
+
+        // ortho (&projection, 0.0f, 640, 0.0f, 360, -100.0, 100.0);
         device.viewport (0, 0, 640, 360);
         device.clear (EVG_CLEAR_COLOR, 0xff050505, 0.0, 0);
 
         source.expose_frame (gc);
-
-        device.present();
         device.flush();
+        device.present();
+        
         device.load_swap (nullptr);
         device.leave_context();
     }
@@ -43,6 +46,32 @@ public:
 private:
     TestVideoSource& source;
     std::unique_ptr<evg::Swap> swap;
+    evgMatrix4 projection;
+
+    void ortho (evgMatrix4* dst, float left, float right,
+                float bottom, float top,
+                float near, float far)
+    {
+        float rml = right - left;
+        float bmt = bottom - top;
+        float fmn = far - near;
+
+        evg_vec4_reset (&dst->x);
+        evg_vec4_reset (&dst->y);
+        evg_vec4_reset (&dst->z);
+        evg_vec4_reset (&dst->t);
+
+        dst->x.x = 2.0f / rml;
+        dst->t.x = (left + right) / -rml;
+
+        dst->y.y = 2.0f / -bmt;
+        dst->t.y = (bottom + top) / bmt;
+
+        dst->z.z = -2.0f / fmn;
+        dst->t.z = (far + near) / -fmn;
+
+        dst->t.w = 1.0f;
+    }
 };
 
 static std::unique_ptr<TestVideoSource> source;
@@ -171,16 +200,19 @@ void Video::start_thread()
 
 void Video::stop_thread()
 {
-    if (! is_running())
-        return;
-    stopflag.store (1);
-    
-    while (is_running()) {
-        std::this_thread::sleep_for (std::chrono::milliseconds (14));
+    if (is_running()) {
+        stopflag.store (1);
+
+        while (is_running()) {
+            std::this_thread::sleep_for (std::chrono::milliseconds (14));
+        }
+
+        stopflag.store (0);
+        running.store (0);
     }
 
-    stopflag.store (0);
-    running.store (0);
+    if (video_thread.joinable())
+        video_thread.join();
 }
 
 } // namespace element

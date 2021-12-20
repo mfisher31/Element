@@ -27,7 +27,7 @@ using SwapSetup = evgSwapSetup;
 
 class Program;
 class Swap;
-class SwapChain;
+class Swap;
 class Buffer;
 class Texture;
 class Shader;
@@ -39,8 +39,8 @@ public:
     virtual bool initialize() = 0;
 
     //=========================================================================
-    virtual SwapChain* create_swap (const evgSwapSetup* setup) = 0;
-    virtual void load_swap (const SwapChain* swap) = 0;
+    virtual Swap* create_swap (const evgSwapSetup* setup) = 0;
+    virtual void load_swap (const Swap* swap) = 0;
     virtual void swap_buffers() = 0;
 
     //=========================================================================
@@ -60,29 +60,45 @@ using PlatformPtr = std::unique_ptr<Platform, void (*) (Platform*)>;
 
 class Device final {
 public:
-    ~Device()
-    {
-        platform.reset();
-    }
-
-    Device() = delete;
-    Device (PlatformPtr plat);
-
-    inline bool have_platform() const noexcept { return platform != nullptr; }
-    inline void enter_context() { platform->enter_context(); }
-    inline void leave_context() { platform->leave_context(); }
-
+    PlatformPtr platform;
+    
+    ~Device();
     void viewport (int x, int y, int width, int height);
     void ortho (float left, float right, float top, float bottom, float near, float far);
     void draw (evgDrawMode mode, uint32_t start, uint32_t nverts);
 
-    CopyMethod copy_method() const noexcept { return m_copy_method; }
+    static const evgDescriptor* descriptor();
 
-    PlatformPtr platform;
+private:
+    Device() = delete;
+    Device (PlatformPtr plat);
 
     //=========================================================================
-    static evgHandle create();
-    static void destroy (evgHandle device);
+    CopyMethod copy_method;
+    
+    //=========================================================================
+    Buffer* active_index_buffer { nullptr };
+    Buffer* active_vertex_buffer[8] { nullptr };
+    Program* active_program { nullptr };
+    Swap* active_swap { nullptr };
+    Stencil* active_stencil { nullptr };
+    Texture* active_target { nullptr };
+    Texture* active_texture[8];
+
+    //=========================================================================
+    bool setup_extensions();
+
+    //=========================================================================
+    static evgHandle _create();
+    static void _destroy (evgHandle device);
+
+    //=========================================================================
+    static void _enter_context (evgHandle dh);
+    static void _leave_context (evgHandle dh);
+    static void _clear_context (evgHandle dh);
+
+    //=========================================================================
+    static void _enable (evgHandle device, uint32_t enablement, bool enabled);
 
     //=========================================================================
     inline static void _viewport (evgHandle dh, int x, int y, int w, int h)
@@ -90,53 +106,7 @@ public:
         (static_cast<Device*> (dh))->viewport (x, y, w, h);
     }
 
-    inline static void _clear (evgHandle device,
-                               uint32_t clear_flags,
-                               uint32_t color,
-                               double depth,
-                               int stencil)
-    {
-        struct PixelARGB {
-            uint8_t b, g, r, a;
-        };
-
-        union ConvertPixel {
-            PixelARGB pixel;
-            uint32_t packed;
-        };
-
-        GLbitfield bits = 0;
-        if ((clear_flags & EVG_CLEAR_COLOR) != 0) {
-            ConvertPixel C;
-            C.packed = color;
-            float r = C.pixel.r / 255.f;
-            float g = C.pixel.g / 255.f;
-            float b = C.pixel.b / 255.f;
-            float a = C.pixel.a / 255.f;
-            glClearColor (r, g, b, a);
-            bits |= GL_COLOR_BUFFER_BIT;
-        }
-
-        if ((clear_flags & EVG_CLEAR_DEPTH) != 0) {
-            glClearDepth (depth);
-            bits |= GL_DEPTH_BUFFER_BIT;
-        }
-
-        if ((clear_flags & EVG_CLEAR_STENCIL) != 0) {
-            glClearStencil ((GLint) stencil);
-            bits |= GL_STENCIL_BUFFER_BIT;
-        }
-
-        glClear (bits);
-    }
-
-    inline static void _ortho (evgHandle dh,
-                               float left, float right,
-                               float top, float bottom,
-                               float near, float far)
-    {
-        (static_cast<Device*> (dh))->ortho (left, right, top, bottom, near, far);
-    }
+    static void _clear (evgHandle device, uint32_t clear_flags, uint32_t color, double depth, int stencil);
 
     inline static void _draw (evgHandle dh, evgDrawMode mode, uint32_t start, uint32_t nverts)
     {
@@ -147,10 +117,7 @@ public:
     static void _flush (evgHandle dh);
 
     //=========================================================================
-    inline static void _clear_context (evgHandle dh)
-    {
-        (static_cast<Device*> (dh))->platform->clear_context();
-    }
+
 
     inline static void _load_index_buffer (evgHandle dh, evgHandle ibh)
     {
@@ -168,7 +135,7 @@ public:
 
     inline static void _load_swap (evgHandle dh, evgHandle sh)
     {
-        (static_cast<Device*> (dh))->platform->load_swap (static_cast<const SwapChain*> (sh));
+        (static_cast<Device*> (dh))->platform->load_swap (static_cast<const Swap*> (sh));
     }
 
     static void _load_texture (evgHandle dh, evgHandle th, int unit);
@@ -181,27 +148,13 @@ public:
             static_cast<Buffer*> (vbh);
     }
 
-private:
-    CopyMethod m_copy_method;
-    evgMatrix4 active_projection;
-
-    Buffer* active_index_buffer { nullptr };
-    Buffer* active_vertex_buffer[8] { nullptr };
-    Program* active_program { nullptr };
-    Swap* active_swap { nullptr };
-    Stencil* active_stencil { nullptr };
-    Texture* active_target { nullptr };
-    Texture* active_texture[8];
-
-    bool setup_extensions();
     EL_DISABLE_COPY (Device);
 };
 
-class SwapChain {
+class Swap {
 public:
-    virtual ~SwapChain() {}
+    virtual ~Swap() {}
 
-    Device* device { nullptr };
     SwapSetup setup { 0 };
 
     static const evgSwapInterface* interface()
@@ -221,7 +174,7 @@ private:
 
     static void _destroy (evgHandle sh)
     {
-        delete static_cast<SwapChain*> (sh);
+        delete static_cast<Swap*> (sh);
     }
 };
 
@@ -386,8 +339,7 @@ public:
 
     struct Resource {
         std::string symbol;
-        evgResourceType type;
-        evgValueType value_type;
+        evgResource resource;
     };
 
     evgShaderType get_type() const noexcept { return type; }
@@ -426,16 +378,18 @@ public:
         return (static_cast<Shader*> (sh))->parse (text);
     }
 
-    inline static void _add_resource (evgHandle sh, const char* name,
+    inline static void _add_resource (evgHandle sh, const char* symbol,
                                       evgResourceType resource,
                                       evgValueType value_type)
     {
         auto self = static_cast<Shader*> (sh);
         self->res.push_back (Resource());
         auto& item = self->res.back();
-        item.symbol = name;
-        item.type = resource;
-        item.value_type = value_type;
+        item.symbol = symbol;
+        item.resource.symbol = item.symbol.c_str();
+        item.resource.type = resource;
+        item.resource.value_type = value_type;
+        item.resource.key = self->res.size() - 1;
     }
 
 private:

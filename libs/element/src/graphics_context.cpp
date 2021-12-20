@@ -6,12 +6,71 @@
 
 namespace element {
 
-GraphicsContext::GraphicsContext (evg::Device& gd)
-    : device (gd)
+class SpriteBuffer {
+public:
+    void prepare (evg::Device& dev)
+    {
+        if (p_points == nullptr)
+            p_points.reset (dev.create_vertex_buffer (sizeof (evgVec3) * 4, EVG_OPT_DYNAMIC));
+        if (p_uv == nullptr)
+            p_uv.reset (dev.create_vertex_buffer (sizeof (evgVec2) * 4, EVG_OPT_DYNAMIC));
+    }
+
+    void load (evg::Device& dev)
+    {
+        if (points_changed)
+            p_points->flush();
+        if (uv_changed)
+            p_uv->flush();
+        dev.load_vertex_buffer (p_points.get(), 0);
+        dev.load_vertex_buffer (p_uv.get(), 1);
+        dev.load_index_buffer (nullptr);
+        uv_changed = points_changed = false;
+    }
+
+    inline void resize (uint32_t width, uint32_t height)
+    {
+        if (m_width != width || m_height != height) {
+            m_width = width;
+            m_height = height;
+            assign_rectangle ((evgVec3*) p_points->data(),
+                              static_cast<float> (m_width),
+                              static_cast<float> (m_height));
+            assign_rectangle ((evgVec2*) p_uv->data(), 0.0, 1.0, 0.0, 1.0);
+            points_changed = uv_changed = true;
+        }
+    }
+
+private:
+    uint32_t m_width, m_height;
+    std::unique_ptr<evg::Buffer> p_points;
+    std::unique_ptr<evg::Buffer> p_uv;
+    bool points_changed = false, uv_changed = false;
+
+    void assign_rectangle (evgVec3* points, float w, float h)
+    {
+        evg_vec3_reset (points);
+        evg_vec3_set (points + 1, w, 0.0, 0.0f);
+        evg_vec3_set (points + 2, 0.0, h, 0.0f);
+        evg_vec3_set (points + 3, w, h, 0.0f);
+    }
+
+    void assign_rectangle (evgVec2* tc, float u0, float u1, float v0, float v1)
+    {
+        evg_vec2_set (tc + 0, u0, v0);
+        evg_vec2_set (tc + 1, u1, v0);
+        evg_vec2_set (tc + 2, u0, v1);
+        evg_vec2_set (tc + 3, u1, v1);
+    }
+};
+
+GraphicsContext::GraphicsContext (evg::Device& dev)
+    : device (dev)
 {
-	uint32_t bufsize = sizeof(evgVec3) * 4;
-	bufsize += sizeof (evgVec2) * 4;
-    sprite_buffer.reset (device.create_vertex_buffer (bufsize, EVG_OPT_DYNAMIC));
+    dev.enter_context();
+    sprite_buffer = std::make_unique<SpriteBuffer>();
+    sprite_buffer->prepare (dev);
+    dev.leave_context();
 }
 
 GraphicsContext::~GraphicsContext()
@@ -19,99 +78,19 @@ GraphicsContext::~GraphicsContext()
     sprite_buffer.reset();
 }
 
-static inline void sprite_uv_limits (float *start, float *end, float size, bool flip)
+void GraphicsContext::draw_sprite (int width, int height)
 {
-	if (! flip) {
-		*start = 0.0f;
-		*end = size;
-	} else {
-		*start = size;
-		*end = 0.0f;
-	}
+    sprite_buffer->resize (static_cast<uint32_t> (width),
+                           static_cast<uint32_t> (height));
+    sprite_buffer->load (device);
+    device.draw (EVG_TRIANGLE_STRIP, 0, 4);
 }
 
-#include <element/evg/vector.h>
-
-static void build_sprite (evg::Buffer& buffer, float width, float height,
-			 float start_u, float end_u, float start_v, float end_v)
+void GraphicsContext::draw_sprite (const evg::Texture& texture)
 {
-	evgVec2 *tvarray = 0; //(evgVec2*) data->texdata[0].array;
-    auto points = (evgVec3*) buffer.data();
-	evg_vec3_reset (points);
-	evg_vec3_set (points + 1, width, 0.0f, 0.0f);
-	evg_vec3_set (points + 2, 0.0f, height, 0.0f);
-	evg_vec3_set (points + 3, width, height, 0.0f);
-
-	evg_vec2_set (tvarray, start_u, start_v);
-	evg_vec2_set (tvarray + 1, end_u, start_v);
-	evg_vec2_set (tvarray + 2, start_u, end_v);
-	evg_vec2_set (tvarray + 3, end_u, end_v);
-}
-
-static inline void build_sprite_norm (evg::Buffer& buffer, float width, float height, uint32_t flip)
-{
-	float u1, u2;
-	float v1, v2;
-	sprite_uv_limits (&u1, &u2, 1.f, (flip & EVG_FLIP_U) != 0);
-	sprite_uv_limits (&v1, &v1, 1.f, (flip & EVG_FLIP_V) != 0);
-	build_sprite (buffer, width, height, u1, u2, v1, v2);
-}
-
-static inline void build_subsprite_norm (evg::Buffer& buffer, float fsub_x,
-					float fsub_y, float fsub_cx,
-					float fsub_cy, float width, float height,
-					uint32_t flip)
-{
-	float start_u, end_u;
-	float start_v, end_v;
-
-	if ((flip & EVG_FLIP_U) == 0) {
-		start_u = fsub_x / width;
-		end_u = (fsub_x + fsub_cx) / width;
-	} else {
-		start_u = (fsub_x + fsub_cx) / width;
-		end_u = fsub_x / width;
-	}
-
-	if ((flip & EVG_FLIP_V) == 0) {
-		start_v = fsub_y / height;
-		end_v = (fsub_y + fsub_cy) / height;
-	} else {
-		start_v = (fsub_y + fsub_cy) / height;
-		end_v = fsub_y / height;
-	}
-
-	build_sprite (buffer, fsub_cx, fsub_cy, start_u, end_u, start_v, end_v);
-}
-
-static inline void build_sprite_rect (evg::Buffer& buffer, evg::Texture *tex,
-				                      float width, float height, uint32_t flip)
-{
-	float u1, u2, v1, v2;
-	sprite_uv_limits (&u1, &u2, (float) tex->width(), (flip & EVG_FLIP_U) != 0);
-	sprite_uv_limits (&v1, &v2, (float) tex->height(), (flip & EVG_FLIP_V) != 0);
-	build_sprite (buffer, width, height, u1, u2, v1, v2);
-}
-
-void GraphicsContext::draw_texture (const evg::Texture& texture)
-{
-#if 0
-	float width, height;
-	struct evgVertexBuffer *data;
-
-	data = gs_vertexbuffer_get_data(graphics->sprite_buffer);
-	if (tex && gs_texture_is_rect(tex))
-		build_sprite_rect(data, tex, width, height, flip);
-	else
-		build_sprite_norm(data, width, height, flip);
-#endif
-    
-    build_sprite_norm (*sprite_buffer, (float)texture.width(), (float)texture.height(), 0);
-    
-    sprite_buffer->flush();
-	device.load_vertex_buffer (sprite_buffer.get(), 0);
-	device.load_index_buffer (nullptr);
-	device.draw (EVG_TRIANGLE_STRIP, 0, 0);
+    sprite_buffer->resize (texture.width(), texture.height());
+    sprite_buffer->load (device);
+    device.draw (EVG_TRIANGLE_STRIP, 0, 4);
 }
 
 evg::Texture* GraphicsContext::load_image_data (const uint8_t* data,
@@ -120,8 +99,8 @@ evg::Texture* GraphicsContext::load_image_data (const uint8_t* data,
 {
     assert (data != nullptr);
     auto tex = device.create_2d_texture (format,
-        static_cast<uint32_t> (width),
-        static_cast<uint32_t> (height));
+                                         static_cast<uint32_t> (width),
+                                         static_cast<uint32_t> (height));
     tex->update (data);
     return tex;
 }

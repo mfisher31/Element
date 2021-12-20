@@ -78,7 +78,6 @@ bool Texture2D::bind_data (const uint8_t** data)
 
     if (! gl::bind_texture (GL_TEXTURE_2D, texture))
         return false;
-
     success = gl::init_face (GL_TEXTURE_2D, gl_format_type, num_levels, gl_format, gl_format_internal, 
                                             compressed, width(), height(), tex_size, &data);
 

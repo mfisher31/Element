@@ -33,6 +33,11 @@ void Device::leave_context() { desc.leave_context (device); }
 void Device::clear_context() { desc.clear_context (device); }
 
 //=========================================================================
+void Device::enable (uint32_t what, bool enabled) {
+    desc.enable (device, what, enabled);
+}
+
+//=========================================================================
 void Device::load_program (Program* program) noexcept
 {
     desc.load_program (device, program != nullptr ? program->handle : nullptr);
@@ -61,11 +66,6 @@ void Device::viewport (int x, int y, int width, int height)
 
 void Device::clear (uint32_t flags, uint32_t color, double depth, int stencil) {
     desc.clear (device, flags, color, depth, stencil);
-}
-
-void Device::ortho (float left, float right, float top, float bottom, float near, float far)
-{
-    desc.ortho (device, left, right, top, bottom, near, far);
 }
 
 void Device::draw (evgDrawMode mode, uint32_t start, uint32_t count)
@@ -154,4 +154,18 @@ Program* Device::create_program()
 
     return nullptr;
 }
+
+Stencil* Device::create_stencil (uint32_t width, uint32_t height, StencilFormat format)
+{
+    auto iface = desc.stencil;
+    if (auto handle = iface->create (device, width, height, format)) {
+        auto st = new Stencil (iface, handle);
+        st->f = format;
+        st->w = width;
+        st->h = height;
+        return st;
+    }
+    return nullptr;
+}
+
 } // namespace evg

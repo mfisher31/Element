@@ -15,7 +15,7 @@ public:
 
     void set_uniform_value (int index, uint32_t size, const void* data)
     {
-        memcpy (unis[index].current_value.get(), data, size);
+        memcpy (res[index].uniform->current_value.get(), data, size);;
     }
 
     void load_buffers (Buffer** vb, Buffer* ib);
@@ -29,7 +29,8 @@ public:
             .create = _create,
             .destroy = _destroy,
             .link = _link,
-            .resource = _resource
+            .resource = _resource,
+            .update_resource = _update_resource
         };
 
         return &I;
@@ -43,35 +44,39 @@ private:
     GLuint VAO = 0;
 
     struct Attribute {
-        std::string symbol;
         uint32_t location;
         uint32_t type;
         uint32_t size;
         uint32_t stride;
-        bool normalized;
+        bool normalized = true;
         uintptr_t offset;
-        uint32_t buffer_slot;
+        int slot = 0;
+        bool changed = true;
     };
 
     struct Uniform {
-        std::string symbol;
         uint32_t location;
-        size_t value_size = 0;
         evgValueType value_type;
+        size_t value_size = 0;
         std::unique_ptr<uint8_t[]> current_value;
         std::unique_ptr<uint8_t[]> default_value;
+        bool changed = true;
     };
 
-    std::vector<evgResource> ress;
+    struct Resource : public Shader::Resource {
+        std::unique_ptr<Attribute> attribute;
+        std::unique_ptr<Uniform> uniform;
+    };
 
-    std::vector<Attribute> atts;
-    std::vector<Uniform> unis;
-    std::vector<Uniform> texes;
+    std::vector<Resource> res;
+    std::vector<Attribute*> atts;
+    std::vector<Uniform*> unis;
 
     static evgHandle _create (evgHandle dh);
     static void _destroy (evgHandle ph);
     static void _link (evgHandle ph, evgHandle vs, evgHandle fs);
     static const evgResource* _resource (evgHandle program, uint32_t index);
+    static void _update_resource (evgHandle program, int key, uint32_t size, const void* data);
 };
 
 }

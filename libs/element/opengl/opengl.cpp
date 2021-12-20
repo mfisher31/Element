@@ -9,8 +9,8 @@
 
 #include "helpers.hpp"
 #include "opengl.hpp"
-#include "x11_glx.hpp"
 #include "program.hpp"
+#include "x11_glx.hpp"
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
@@ -23,21 +23,25 @@ namespace gl {
 Device::Device (PlatformPtr plat)
     : platform (std::move (plat))
 {
-    evg_mat4_reset (&active_projection);
-    for (int i =0; i < 8; ++i)
+    for (int i = 0; i < 8; ++i)
         active_vertex_buffer[i] = nullptr;
-    for (int i =0; i < 8; ++i)
+    for (int i = 0; i < 8; ++i)
         active_texture[i] = nullptr;
 }
 
-evgHandle Device::create()
+Device::~Device()
+{
+    platform.reset();
+}
+
+evgHandle Device::_create()
 {
     std::unique_ptr<Device> device;
 
     if (auto plat = PlatformPtr (gl::glx_platform_new(), gl::glx_platform_delete))
         device.reset (new Device (std::move (plat)));
 
-    if (device == nullptr || ! device->have_platform())
+    if (device == nullptr || device->platform == nullptr)
         return nullptr;
 
     if (! device->setup_extensions()) {
@@ -52,7 +56,7 @@ evgHandle Device::create()
     return device.release();
 }
 
-void Device::destroy (evgHandle device)
+void Device::_destroy (evgHandle device)
 {
     delete static_cast<Device*> (device);
 }
@@ -79,11 +83,11 @@ bool Device::setup_extensions()
     }
 
     if (GLAD_GL_VERSION_4_3 || GLAD_GL_ARB_copy_image)
-        m_copy_method = gl::CopyMethod::ARB;
+        copy_method = gl::CopyMethod::ARB;
     else if (GLAD_GL_NV_copy_image)
-        m_copy_method = gl::CopyMethod::NV;
+        copy_method = gl::CopyMethod::NV;
     else
-        m_copy_method = gl::CopyMethod::FBO_BLIT;
+        copy_method = gl::CopyMethod::FBO_BLIT;
 
     return true;
 }
@@ -131,9 +135,12 @@ void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
     auto ibuf = active_index_buffer;
     auto program = active_program;
 
+    float width = 500.f;
+    float height = 500.f;
+
     if (ibuf == nullptr && vbuf == nullptr)
         goto abort;
-    
+
     if (program == nullptr)
         goto noprog;
 
@@ -152,7 +159,7 @@ void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
         else
             glBindTexture (GL_TEXTURE_2D, 0);
     }
-    
+
     program->load_buffers (active_vertex_buffer, ibuf);
     glUseProgram (program->object());
     program->process_uniforms();
@@ -173,7 +180,82 @@ done:
 }
 
 //=============================================================================
-void Device::_present (evgHandle dh) {
+void Device::_enter_context (evgHandle dh)
+{
+    (static_cast<Device*> (dh))->platform->enter_context();
+}
+
+void Device::_leave_context (evgHandle dh)
+{
+    (static_cast<Device*> (dh))->platform->leave_context();
+}
+
+void Device::_clear_context (evgHandle dh)
+{
+    (static_cast<Device*> (dh))->platform->clear_context();
+}
+
+//=============================================================================
+void Device::_enable (evgHandle dh, uint32_t enablement, bool enabled)
+{
+    auto device = static_cast<Device*> (dh);
+    switch (enablement) {
+        case EVG_FRAMEBUFFER_SRGB:
+            enabled ? glEnable (GL_FRAMEBUFFER_SRGB) : glDisable (GL_FRAMEBUFFER_SRGB);
+            break;
+        case EVG_DEPTH_TEST:
+            enabled ? glEnable (GL_DEPTH_TEST) : glDisable (GL_DEPTH_TEST);
+            break;
+        case EVG_STENCIL_TEST:
+            enabled ? glEnable (GL_STENCIL_TEST) : glDisable (GL_STENCIL_TEST);
+            break;
+    }
+}
+
+//==
+void Device::_clear (evgHandle device,
+                     uint32_t clear_flags,
+                     uint32_t color,
+                     double depth,
+                     int stencil)
+{
+    struct PixelARGB {
+        uint8_t b, g, r, a;
+    };
+
+    union ConvertPixel {
+        PixelARGB pixel;
+        uint32_t packed;
+    };
+
+    GLbitfield bits = 0;
+    if ((clear_flags & EVG_CLEAR_COLOR) != 0) {
+        ConvertPixel C;
+        C.packed = color;
+        float r = C.pixel.r / 255.f;
+        float g = C.pixel.g / 255.f;
+        float b = C.pixel.b / 255.f;
+        float a = C.pixel.a / 255.f;
+        glClearColor (r, g, b, a);
+        bits |= GL_COLOR_BUFFER_BIT;
+    }
+
+    if ((clear_flags & EVG_CLEAR_DEPTH) != 0) {
+        glClearDepth (depth);
+        bits |= GL_DEPTH_BUFFER_BIT;
+    }
+
+    if ((clear_flags & EVG_CLEAR_STENCIL) != 0) {
+        glClearStencil ((GLint) stencil);
+        bits |= GL_STENCIL_BUFFER_BIT;
+    }
+
+    glClear (bits);
+}
+
+//=============================================================================
+void Device::_present (evgHandle dh)
+{
     auto device = static_cast<Device*> (dh);
     device->platform->swap_buffers();
 }
@@ -197,109 +279,92 @@ void Device::_load_program (evgHandle dh, evgHandle ph)
 
 void Device::_load_texture (evgHandle dh, evgHandle th, int unit)
 {
-    auto device  = static_cast<Device*> (dh);
+    auto device = static_cast<Device*> (dh);
     auto texture = static_cast<Texture*> (th);
     auto current = device->active_texture[unit];
-
-    // if (current == texture)
-    //     return;
-
-    // glActiveTexture (GL_TEXTURE0 + unit);
-    // if (! gl::check_ok (""))
-    //     return;
-    
     device->active_texture[unit] = texture;
-
-    // if (texture == nullptr)
-    //     return;
-    // if (! texture->bind()) {
-    //     std::clog << "could not bind texture\n";
-    // } else {
-    //     std::clog << "bound texture\n";
-    // }
-    // if (!gl_tex_param_i(tex->gl_target, GL_TEXTURE_SRGB_DECODE_EXT, decode))
-	// 	goto fail;
 }
 
-void Device::_load_stencil (evgHandle dh, evgHandle sh) {
+void Device::_load_stencil (evgHandle dh, evgHandle sh)
+{
     (static_cast<Device*> (dh))->active_stencil =
         static_cast<Stencil*> (sh);
 }
 
-void Device::_load_target (evgHandle dh, evgHandle th) {
+void Device::_load_target (evgHandle dh, evgHandle th)
+{
     (static_cast<Device*> (dh))->active_target =
         static_cast<Texture*> (th);
 }
 
+const evgDescriptor* Device::descriptor()
+{
+    static const evgDescriptor D = {
+        .create = _create,
+        .destroy = _destroy,
+        .enter_context = _enter_context,
+        .leave_context = _leave_context,
+        .clear_context = _clear_context,
+        .enable = _enable,
+        .viewport = _viewport,
+        .clear = _clear,
+        .draw = _draw,
+        .present = _present,
+        .flush = _flush,
+        .load_vertex_buffer = _load_vertex_buffer,
+        .load_index_buffer = _load_index_buffer,
+        .load_program = _load_program,
+        .load_texture = _load_texture,
+        .load_target = _load_target,
+        .load_stencil = _load_stencil,
+        .load_swap = _load_swap,
+        .buffer = Buffer::interface(),
+        .shader = Shader::interface(),
+        .program = Program::interface(),
+        .texture = Texture::interface(),
+        .stencil = Stencil::interface(),
+        .swap = Swap::interface()
+    };
+
+    return &D;
+}
+
 } // namespace gl
 
-using namespace gl;
+using gl::Device;
 
 //=============================================================================
 struct OpenGL {
-    using Descriptor = evg::Descriptor<gl::Device>;
-    Descriptor vgdesc;
-
-    OpenGL()
-        : vgdesc (Device::create, Device::destroy)
+    OpenGL() {}
+    static elHandle create()
     {
-        vgdesc.viewport = Device::_viewport;
-        vgdesc.clear = Device::_clear;
-        
-        vgdesc.ortho = Device::_ortho;
-        vgdesc.draw = Device::_draw;
-        vgdesc.present = Device::_present;
-        vgdesc.flush = Device::_flush;
-        vgdesc.clear_context = Device::_clear_context;
-        
-        vgdesc.load_program = Device::_load_program;
-        vgdesc.load_index_buffer = Device::_load_index_buffer;
-        vgdesc.load_shader = Device::_load_shader;
-        vgdesc.load_swap = Device::_load_swap;
-        vgdesc.load_texture = Device::_load_texture;
-        vgdesc.load_vertex_buffer = Device::_load_vertex_buffer;
-        vgdesc.load_stencil = Device::_load_stencil;
-        vgdesc.load_target = Device::_load_target;
+        auto m = new OpenGL();
+        return m;
+    }
 
-        vgdesc.texture = Texture::interface();
-        vgdesc.buffer = Buffer::interface();
-        vgdesc.shader = Shader::interface();
-        vgdesc.program = Program::interface();
-        vgdesc.swap = SwapChain::interface();
-        vgdesc.stencil = Stencil::interface();
+    static void destroy (elHandle handle)
+    {
+        delete (OpenGL*) handle;
+    }
+
+    static const void* extension (elHandle handle, const char* ID)
+    {
+        gl::unused (handle);
+        if (strcmp (ID, "el.GraphicsDevice") == 0)
+            return (const void*) Device::descriptor();
+        return nullptr;
     }
 };
-
-elHandle gl_create()
-{
-    auto m = new OpenGL();
-    return m;
-}
-
-void gl_destroy (elHandle handle)
-{
-    delete (OpenGL*) handle;
-}
-
-const void* gl_extension (elHandle handle, const char* ID)
-{
-    auto gl = (OpenGL*) handle;
-    if (strcmp (ID, "el.GraphicsDevice") == 0) {
-        return &gl->vgdesc;
-    }
-    std::clog << "[opengl] check: " << ID << std::endl;
-    return nullptr;
-}
 
 const elDescriptor* element_descriptor()
 {
     static const elDescriptor D = {
         .ID = "el.OpenGL",
-        .create = gl_create,
-        .extension = gl_extension,
+        .create = OpenGL::create,
+        .extension = OpenGL::extension,
         .load = nullptr,
         .unload = nullptr,
-        .destroy = gl_destroy,
+        .destroy = OpenGL::destroy,
     };
     return &D;
 }
