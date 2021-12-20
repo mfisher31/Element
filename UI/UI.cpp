@@ -28,7 +28,7 @@ public:
 
     void paint (juce::Graphics& g)
     {
-        g.fillAll (juce::Colours::black.brighter());
+        g.fillAll (juce::Colours::black.brighter (0.3));
         g.setColour (juce::Colours::white);
         g.drawText ("Hello World", getLocalBounds().toFloat(), juce::Justification::centred, true);
     }
@@ -42,6 +42,9 @@ public:
             removeAllChildren();
             embed->setVisible (false);
         }
+
+        resized();
+        repaint();
     }
 
     evgSwapSetup getSwapSetup() const
@@ -52,7 +55,8 @@ public:
         setup.height = 360;
         setup.nbuffers = 1;
         setup.window.xwindow = embed->getHostWindowID();
-        setup.zstencil_format = EVG_STENCIL_24_S8;
+        setup.format = EVG_COLOR_FORMAT_RGBA;
+        setup.stencil = EVG_STENCIL_24_S8;
         return std::move (setup);
     }
 
