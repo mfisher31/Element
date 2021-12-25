@@ -33,9 +33,11 @@ void Device::leave_context() { desc.leave_context (device); }
 void Device::clear_context() { desc.clear_context (device); }
 
 //=========================================================================
-void Device::enable (uint32_t what, bool enabled) {
-    desc.enable (device, what, enabled);
-}
+void Device::save_state() { desc.save_state (device); }
+void Device::restore_state() { desc.restore_state (device); }
+
+//=========================================================================
+void Device::enable (uint32_t what, bool enabled) { desc.enable (device, what, enabled); }
 
 //=========================================================================
 void Device::load_program (Program* program) noexcept
@@ -77,7 +79,7 @@ void Device::present() { desc.present (device); }
 void Device::flush() { desc.flush (device); }
 
 //=========================================================================
-Swap* Device::create_swap (const evgSwapSetup* setup)
+Swap* Device::create_swap (const evgSwapInfo* setup)
 {
     auto iface = desc.swap;
     if (auto handle = iface->create (device, setup)) {
@@ -95,7 +97,7 @@ Texture* Device::create_2d_texture (evgColorFormat format, uint32_t width, uint3
         .type = EVG_TEXTURE_2D,
         .format = format,
         .levels = 1,
-        .flags = EVG_OPT_DYNAMIC,
+        .flags = EVG_DYNAMIC,
         .width = width,
         .height = height
     };

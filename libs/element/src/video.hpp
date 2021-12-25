@@ -24,7 +24,7 @@
 #include <thread>
 
 #include <element/element.h>
-#include <element/graphics.h>
+#include <element/graphics.hpp>
 #include <element/evg/device.hpp>
 
 struct elVideo{};
@@ -44,7 +44,7 @@ public:
     Video();
     ~Video();
     
-    VideoDisplay* create_display (const evgSwapSetup* setup);
+    VideoDisplay* create_display (const evgSwapInfo* setup);
     bool load_device_descriptor (const evgDescriptor* desc);
     evg::Device& graphics_device() { return *graphics; }
 

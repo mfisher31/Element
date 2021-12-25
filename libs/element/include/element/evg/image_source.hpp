@@ -1,27 +1,22 @@
-
 #pragma once
 
-#include <string>
 #include <memory>
 #include <mutex>
 
-namespace element {
-class GraphicsContext;
-class TestVideoSource {
-public:
-    enum ObjectMode {
-        Triangle,
-        Square,
-        Image
-    };
+#include "element/evg/source.hpp"
 
-    explicit TestVideoSource (ObjectMode m = Image);
-    ~TestVideoSource();
+namespace evg {
+
+class Context;
+
+class ImageSource : public Source {
+public:
+    ImageSource();
+    ~ImageSource();
     
     bool load_file (const std::string& file);
     void process_frame();
-
-    void expose_frame (GraphicsContext& gc);
+    void expose (Context& ctx) override;
     std::mutex& render_mutex() { return _render_mutex; }
 
 private:
@@ -30,7 +25,6 @@ private:
     std::mutex _render_mutex;
     bool data_changed = false;
     int width = 0, height = 0;
-    ObjectMode mode;
 };
 
 }

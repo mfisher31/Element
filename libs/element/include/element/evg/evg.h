@@ -6,14 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "element/evg/vector.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct evgVec2 evgVec2;
-typedef struct evgVec3 evgVec3;
 
 typedef enum {
     EVG_COLOR_FORMAT_UNKNOWN = 0,
@@ -22,23 +17,18 @@ typedef enum {
     EVG_COLOR_FORMAT_BGRA
 } evgColorFormat;
 
-static inline const char* evg_color_format_string (evgColorFormat format)
-{
-    switch (format) {
-        case EVG_COLOR_FORMAT_UNKNOWN:
-            return "Unknown";
-            break;
-        case EVG_COLOR_FORMAT_RGBA:
-            return "RGBA";
-            break;
-        case EVG_COLOR_FORMAT_BGRX:
-            return "BGRX";
-            break;
-        case EVG_COLOR_FORMAT_BGRA:
-            return "BGRA";
-            break;
-    }
-}
+typedef enum {
+    EL_COLOR_SPACE_DEFAULT,
+    EL_COLOR_SPACE_601,
+    EL_COLOR_SPACE_709,
+    EL_COLOR_SPACE_SRGB
+} evgColorSpace;
+
+typedef enum {
+    EL_VIDEO_RANGE_DEFAULT,
+    EL_VIDEO_RANGE_PARTIAL,
+    EL_VIDEO_RANGE_FULL
+} evgVideoRange;
 
 typedef enum {
     EVG_DRAW_MODE_POINTS,
@@ -62,21 +52,18 @@ typedef enum {
     EVG_STENCIL_32F_S8X24,
 } evgStencilFormat;
 
-#define EVG_OPT_USE_MIPMAPS   (1 << 0x0000)
-#define EVG_OPT_DYNAMIC       (1 << 0x0001)
-#define EVG_OPT_RENDER_TARGET (1 << 0x0002)
-#define EVG_OPT_DUMMY         (1 << 0x0003)
-
-#define EVG_CLEAR_COLOR   (1 << 0)
-#define EVG_CLEAR_DEPTH   (1 << 1)
-#define EVG_CLEAR_STENCIL (1 << 2)
-
-#define EVG_FLIP_U (1 << 0)
-#define EVG_FLIP_V (1 << 1)
-
-#define EVG_FRAMEBUFFER_SRGB (1 << 0x0010)
-#define EVG_DEPTH_TEST       (1 << 0x0011)
-#define EVG_STENCIL_TEST     (1 << 0x0012)
+#define EVG_MIPMAPS          (1 << 0x0000)
+#define EVG_DYNAMIC          (1 << 0x0001)
+#define EVG_RENDER_TARGET    (1 << 0x0002)
+#define EVG_DUMMY            (1 << 0x0003)
+#define EVG_FLIP_U           (1 << 0x0004)
+#define EVG_FLIP_V           (1 << 0x0005)
+#define EVG_CLEAR_COLOR      (1 << 0x0006)
+#define EVG_CLEAR_DEPTH      (1 << 0x0007)
+#define EVG_CLEAR_STENCIL    (1 << 0x0008)
+#define EVG_FRAMEBUFFER_SRGB (1 << 0x0009)
+#define EVG_DEPTH_TEST       (1 << 0x000A)
+#define EVG_STENCIL_TEST     (1 << 0x000B)
 
 typedef struct {
 #if defined(__linux__)
@@ -94,7 +81,7 @@ typedef struct {
     evgColorFormat format;
     evgStencilFormat stencil;
     uint32_t adapter;
-} evgSwapSetup;
+} evgSwapInfo;
 
 typedef enum {
     EVG_ATTRIB_POSITION,
@@ -135,7 +122,7 @@ typedef enum {
 typedef void* evgHandle;
 
 typedef struct {
-    evgHandle (*create) (evgHandle device, const evgSwapSetup* setup);
+    evgHandle (*create) (evgHandle device, const evgSwapInfo* setup);
     void (*destroy) (evgHandle swap);
 } evgSwapInterface;
 
@@ -240,6 +227,9 @@ typedef struct {
     void (*leave_context) (evgHandle device);
     void (*clear_context) (evgHandle device);
 
+    void (*save_state) (evgHandle device);
+    void (*restore_state) (evgHandle device);
+    
     void (*enable) (evgHandle device, uint32_t enablement, bool enabled);
 
     void (*viewport) (evgHandle device, int x, int y, int width, int height);
@@ -263,6 +253,49 @@ typedef struct {
     const evgStencilInterface* stencil;
     const evgSwapInterface* swap;
 } evgDescriptor;
+
+//=============================================================================
+inline static const char* evg_color_format_string (evgColorFormat format)
+{
+    switch (format) {
+        case EVG_COLOR_FORMAT_UNKNOWN:
+            return "Unknown";
+            break;
+        case EVG_COLOR_FORMAT_RGBA:
+            return "RGBA";
+            break;
+        case EVG_COLOR_FORMAT_BGRX:
+            return "BGRX";
+            break;
+        case EVG_COLOR_FORMAT_BGRA:
+            return "BGRA";
+            break;
+    }
+}
+
+static inline uint32_t evg_color_format_is_compressed (evgColorFormat format)
+{
+    switch (format) {
+        default:
+            break;
+    }
+    return false;
+}
+static inline uint32_t evg_color_format_bpp (evgColorFormat format)
+{
+    switch (format) {
+        case EVG_COLOR_FORMAT_UNKNOWN:
+            return 0;
+        case EVG_COLOR_FORMAT_RGBA:
+        case EVG_COLOR_FORMAT_BGRA:
+        case EVG_COLOR_FORMAT_BGRX:
+            return 32;
+        default:
+            break;
+    }
+
+    return 0;
+}
 
 inline static bool evg_descriptor_valid (const evgDescriptor* desc)
 {

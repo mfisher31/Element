@@ -1,9 +1,7 @@
 
-#ifndef EL_GRAPHICS_H
-#define EL_GRAPHICS_H
-
+#pragma once
 #include <element/element.h>
 #include <element/evg/evg.h>
 #include <element/evg/vector.h>
-
-#endif
+#include <element/evg/matrix.h>
+#include <element/evg/context.hpp>

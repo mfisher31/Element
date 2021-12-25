@@ -28,6 +28,26 @@ static inline void evg_mat4_copy (evgMatrix4 *dst, const evgMatrix4 *src) {
 	memcpy (dst, src, sizeof (evgMatrix4));
 }
 
+static inline void evg_mat4_ortho (evgMatrix4* dst, float left, float right, float bottom, float top, float near, float far)
+{
+	evg_mat4_reset (dst);
+
+    float rml = right - left;
+    float bmt = bottom - top;
+    float fmn = far - near;
+
+    dst->x.x = 2.0f / rml;
+    dst->t.x = (left + right) / -rml;
+
+    dst->y.y = 2.0f / -bmt;
+    dst->t.y = (bottom + top) / bmt;
+
+    dst->z.z = -2.0f / fmn;
+    dst->t.z = (far + near) / -fmn;
+
+    dst->t.w = 1.0f;
+}
+
 static inline void evg_mat4_multiply (evgMatrix4 *dst, const evgMatrix4 *m1, const evgMatrix4 *m2)
 {
 	const evgVec4 *m1v = (const evgVec4 *)m1;

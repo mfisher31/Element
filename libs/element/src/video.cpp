@@ -4,11 +4,12 @@
 #include <iostream>
 
 #include "element/context.hpp"
-#include "element/evg/matrix.h"
-#include "element/source.hpp"
-#include "graphics_context.hpp"
-#include "graphics_device.hpp"
+#include "element/graphics.hpp"
+#include "element/evg/image_source.hpp"
+#include "element/evg/solid_source.hpp"
+
 #include "video.hpp"
+
 namespace element {
 template <uint32_t R>
 struct fps_to_nanoseconds {
@@ -22,71 +23,56 @@ using FPS5 = fps_to_nanoseconds<5>;
 
 class TestDisplay : public VideoDisplay {
 public:
-    TestDisplay (TestVideoSource& s, evg::Swap* sw)
-        : source (s), swap (sw) { }
+    TestDisplay (evg::ImageSource& s, evg::SolidSource& sd, evg::Swap* sw)
+        : source (s), solid (sd), swap (sw) {}
 
-    void render (GraphicsContext& gc)
+    void render (evg::Context& g)
     {
-        auto& device = gc.get_device();
+        auto& device = g.get_device();
         device.load_swap (swap.get());
         device.enter_context();
 
-        // ortho (&projection, 0.0f, 640, 0.0f, 360, -100.0, 100.0);
         device.viewport (0, 0, 640, 360);
         device.clear (EVG_CLEAR_COLOR, 0xff050505, 0.0, 0);
+        g.ortho (0.0f, 640.0, 0.0f, 360.0, -100.0, 100.0);
 
-        source.expose_frame (gc);
+        g.save_state();
+        source.expose (g);
+        g.restore_state();
+
+        // g.save_state();
+        // solid.expose_frame (g);
+        // g.restore_state();
+
         device.flush();
         device.present();
-        
+
         device.load_swap (nullptr);
         device.leave_context();
     }
 
 private:
-    TestVideoSource& source;
+    evg::Source& source;
+    evg::Source& solid;
     std::unique_ptr<evg::Swap> swap;
     evgMatrix4 projection;
-
-    void ortho (evgMatrix4* dst, float left, float right,
-                float bottom, float top,
-                float near, float far)
-    {
-        float rml = right - left;
-        float bmt = bottom - top;
-        float fmn = far - near;
-
-        evg_vec4_reset (&dst->x);
-        evg_vec4_reset (&dst->y);
-        evg_vec4_reset (&dst->z);
-        evg_vec4_reset (&dst->t);
-
-        dst->x.x = 2.0f / rml;
-        dst->t.x = (left + right) / -rml;
-
-        dst->y.y = 2.0f / -bmt;
-        dst->t.y = (bottom + top) / bmt;
-
-        dst->z.z = -2.0f / fmn;
-        dst->t.z = (far + near) / -fmn;
-
-        dst->t.w = 1.0f;
-    }
 };
 
-static std::unique_ptr<TestVideoSource> source;
-static std::unique_ptr<GraphicsContext> context;
+static std::unique_ptr<evg::ImageSource> source;
+static std::unique_ptr<evg::SolidSource> solid;
+static std::unique_ptr<evg::Context> context;
 static std::unique_ptr<TestDisplay> display;
 static std::mutex display_mutex;
 
 static bool process_video (Video& video)
 {
     if (! context) {
-        context.reset (new GraphicsContext (video.graphics_device()));
+        context.reset (new evg::Context (video.graphics_device()));
     }
 
     if (! source) {
-        source.reset (new TestVideoSource());
+        solid.reset (new evg::SolidSource());
+        source.reset (new evg::ImageSource());
         source->load_file ("/home/mfisher/Desktop/500_x_500_SMPTE_Color_Bars.png");
     }
 
@@ -99,7 +85,9 @@ static bool process_video (Video& video)
 
     {
         device.enter_context();
-        std::scoped_lock sl (source->render_mutex());
+        std::scoped_lock sl1 (solid->render_mutex());
+        solid->process_frame();
+        std::scoped_lock sl2 (source->render_mutex());
         source->process_frame();
         device.leave_context();
 
@@ -118,9 +106,10 @@ void Video::thread_entry (Video& video)
 {
     while (process_video (video))
         ;
-    source.reset();
-    context.reset();
     display.reset();
+    source.reset();
+    solid.reset();
+    context.reset();
     std::clog << "[info] video thread stopped\n";
     video.stopflag.store (0);
     video.running.store (0);
@@ -139,7 +128,7 @@ Video::~Video()
     }
 }
 
-VideoDisplay* Video::create_display (const evgSwapSetup* setup)
+VideoDisplay* Video::create_display (const evgSwapInfo* setup)
 {
     if (source == nullptr || graphics == nullptr)
         return nullptr;
@@ -147,7 +136,7 @@ VideoDisplay* Video::create_display (const evgSwapSetup* setup)
     if (setup == nullptr) {
         std::unique_ptr<TestDisplay> deleter;
         {
-            std::scoped_lock sl (display_mutex);
+            std::lock_guard<std::mutex> sl (display_mutex);
             display.swap (deleter);
         }
         deleter.reset();
@@ -158,9 +147,9 @@ VideoDisplay* Video::create_display (const evgSwapSetup* setup)
     if (swap == nullptr)
         return nullptr;
 
-    auto display2 = std::make_unique<TestDisplay> (*source, swap);
+    auto display2 = std::make_unique<TestDisplay> (*source, *solid, swap);
     {
-        std::scoped_lock sl (display_mutex);
+        std::lock_guard<std::mutex> sl (display_mutex);
         display.swap (display2);
     }
 

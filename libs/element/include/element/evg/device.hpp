@@ -13,7 +13,7 @@ using BufferInfo = evgBufferInfo;
 using ColorFormat = evgColorFormat;
 using DrawMode = evgDrawMode;
 using StencilFormat = evgStencilFormat;
-using SwapSetup = evgSwapSetup;
+using SwapSetup = evgSwapInfo;
 using TextureInfo = evgTextureInfo;
 using TextureType = evgTextureType;
 using ValueType = evgValueType;
@@ -272,6 +272,10 @@ public:
     void leave_context();
     void clear_context();
 
+    //=========================================================================
+    void save_state();
+    void restore_state();
+    
     //=========================================================================
     void enable (uint32_t what, bool enabled);
 

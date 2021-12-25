@@ -192,8 +192,10 @@ def element_sources (ctx):
         libs/element/src/video.cpp
         libs/element/src/evg/context.cpp
         libs/element/src/evg/device.cpp
-        libs/element/src/graphics_context.cpp
-        libs/element/include/element/source.cpp
+        libs/element/src/evg/image_source.cpp
+        libs/element/src/evg/program.cpp
+        libs/element/src/evg/solid_source.cpp
+        libs/element/src/evg/source.cpp
         '''.split()
     if ctx.host_is_windows():
         lib_sources.append ('libs/element/src/dlfcn-win32.c')
