@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 #include <element/element.h>
-#include <element/graphics.h>
+#include <element/graphics.hpp>
 
 namespace element {
 
@@ -30,7 +30,7 @@ public:
     virtual ~Context();
     
     //=========================================================================
-    VideoDisplay* test_create_video_display (const evgSwapSetup*);
+    VideoDisplay* test_create_video_display (const evgSwapInfo*);
     
     void test_open_module (const std::string& path);
     void test_load_modules();

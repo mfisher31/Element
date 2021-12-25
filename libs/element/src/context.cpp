@@ -10,7 +10,7 @@
 #include "dynlib.h"
 #include "element/evg/device.hpp"
 #include "element/context.hpp"
-#include "element/graphics.h"
+#include "element/graphics.hpp"
 #include "element/plugin.h"
 #include "scripting.hpp"
 #include "video.hpp"
@@ -380,7 +380,7 @@ void Context::test_discover_modules()
     modules->discover();
 }
 
-VideoDisplay* Context::test_create_video_display (const evgSwapSetup* setup) {
+VideoDisplay* Context::test_create_video_display (const evgSwapInfo* setup) {
     return video->create_display (setup);
 }
 
