@@ -47,9 +47,9 @@ public:
         repaint();
     }
 
-    evgSwapSetup getSwapSetup() const
+    evgSwapInfo getSwapSetup() const
     {
-        evgSwapSetup setup;
+        evgSwapInfo setup;
         setup.adapter = 0;
         setup.width = 640;
         setup.height = 360;
