@@ -93,15 +93,7 @@ public:
     {
         if (! data)
             return;
-        
         texture.reset (ctx.load_image_data (*data, data->format(), data->width(), data->height()));
-
-        if (texture) {
-            std::clog << "loaded " << evg_color_format_string (data->format()) << " image\n";
-        } else {
-            std::clog << "image load failed\n";
-        }
-
         data.reset();
     }
 
