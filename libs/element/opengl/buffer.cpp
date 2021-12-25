@@ -4,13 +4,12 @@
 
 namespace gl {
 
-//==
 Buffer::Buffer (evgBufferType btype, uint32_t capacity, uint32_t flags)
 {
     info.type = btype;
     info.capacity = capacity;
     info.size = capacity;
-    dynamic = (flags & EVG_OPT_DYNAMIC) != 0;
+    dynamic = (flags & EVG_DYNAMIC) != 0;
     
     switch (info.type) {
         case EVG_BUFFER_ARRAY:

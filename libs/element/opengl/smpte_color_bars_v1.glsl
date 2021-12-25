@@ -1,6 +1,6 @@
 // Robby Kraft
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void render_smpte_bars (out vec4 fragColor, in vec2 fragCoord)
 {
     float br = 0.75; // a less popular SMPTE version uses 1.0
 
@@ -53,6 +53,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 	float bottom_blue =  0.35*float(fourth1) + float(fourth2 && !fourth1) + 0.5*float(fourth3 && !fourth2)  + 0.075*float(fourth4 && !fourth3) + 0.075*float(littleThird2 && !littleThird1) + 0.15*float(littleThird3 && !littleThird2) + 0.075*float(!sev6);
 
 	fragColor = vec4(top_red*float(row1)   + mid_red*float(row2 && !row1) + bottom_red*float(!row2), 
-	                 top_green*float(row1) + mid_green*float(row2 && !row1) + bottom_green*float(!row2), 
-	                 top_blue*float(row1)  + mid_blue*float(row2 && !row1) + bottom_blue*float(!row2),1.);
+	                 top_green*float(row1) + mid_green*float(row2 && !row1) + bottom_green*float(!row2),
+	                 top_blue*float(row1)  + mid_blue*float(row2 && !row1) + bottom_blue*float(!row2),1.0);
 }

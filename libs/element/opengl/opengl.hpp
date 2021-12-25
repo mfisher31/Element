@@ -23,7 +23,7 @@ enum class CopyMethod {
 
 using TextureType = evgTextureType;
 using TextureSetup = evgTextureInfo;
-using SwapSetup = evgSwapSetup;
+using SwapSetup = evgSwapInfo;
 
 class Program;
 class Swap;
@@ -39,7 +39,7 @@ public:
     virtual bool initialize() = 0;
 
     //=========================================================================
-    virtual Swap* create_swap (const evgSwapSetup* setup) = 0;
+    virtual Swap* create_swap (const evgSwapInfo* setup) = 0;
     virtual void load_swap (const Swap* swap) = 0;
     virtual void swap_buffers() = 0;
 
@@ -55,13 +55,13 @@ protected:
 private:
     EL_DISABLE_COPY (Platform);
 };
-
-using PlatformPtr = std::unique_ptr<Platform, void (*) (Platform*)>;
+using PlatformDeleter = void (*) (Platform*);
+using PlatformPtr = std::unique_ptr<Platform, PlatformDeleter>;
 
 class Device final {
 public:
     PlatformPtr platform;
-    
+
     ~Device();
     void viewport (int x, int y, int width, int height);
     void ortho (float left, float right, float top, float bottom, float near, float far);
@@ -75,15 +75,89 @@ private:
 
     //=========================================================================
     CopyMethod copy_method;
-    
+
     //=========================================================================
-    Buffer* active_index_buffer { nullptr };
-    Buffer* active_vertex_buffer[8] { nullptr };
-    Program* active_program { nullptr };
-    Swap* active_swap { nullptr };
-    Stencil* active_stencil { nullptr };
-    Texture* active_target { nullptr };
-    Texture* active_texture[8];
+    struct State {
+        Buffer* ebo { nullptr };
+        Buffer* vbo[8] { nullptr };
+        Program* program { nullptr };
+        Swap* active_swap { nullptr };
+        Stencil* stencil { nullptr };
+        Texture* target { nullptr };
+        Texture* texture[8];
+
+        void clear() noexcept
+        {
+            ebo = nullptr;
+            memset (vbo, 0, 8 * sizeof (Buffer*));
+            program = nullptr;
+            active_swap = nullptr;
+            stencil = nullptr;
+            target = nullptr;
+            memset (texture, 0, 8 * sizeof (Texture*));
+        }
+    };
+
+    template <class T>
+    class Stack {
+    public:
+        ~Stack()
+        {
+            clear();
+            delete_items();
+        }
+
+        Stack()
+        {
+            items.reserve (4);
+            while (items.size() < 4)
+                items.push_back (new T());
+        }
+
+        inline T* push() noexcept
+        {
+            if (top + 1 >= items.size())
+                items.push_back (new T());
+            *items[top + 1] = *items[top];
+            return items[++top];
+        }
+
+        inline T* pop() noexcept
+        {
+            if (top > 0) {
+                items[top]->clear();
+                --top;
+            }
+            return items[top];
+        }
+
+        inline T* get() const noexcept { return items[top]; }
+
+        inline void clear() noexcept
+        {
+            top = 0;
+            for (auto* i : items)
+                i->clear();
+        }
+
+        inline size_t size() const noexcept { return items.size(); }
+
+    private:
+        std::vector<T*> items;
+        size_t top = 0;
+
+        void delete_items()
+        {
+            for (int i = (int) items.size(); --i >= 0;) {
+                auto ptr = items[i];
+                items.erase (std::remove (items.begin(), items.end(), ptr));
+                delete ptr;
+            }
+        }
+    };
+
+    Stack<State> state_stack;
+    State* state = nullptr;
 
     //=========================================================================
     bool setup_extensions();
@@ -91,6 +165,10 @@ private:
     //=========================================================================
     static evgHandle _create();
     static void _destroy (evgHandle device);
+
+    //=========================================================================
+    static void _save_state (evgHandle dh);
+    static void _restore_state (evgHandle dh);
 
     //=========================================================================
     static void _enter_context (evgHandle dh);
@@ -118,35 +196,18 @@ private:
 
     //=========================================================================
 
-
     inline static void _load_index_buffer (evgHandle dh, evgHandle ibh)
     {
-        (static_cast<Device*> (dh))->active_index_buffer =
+        (static_cast<Device*> (dh))->state->ebo =
             static_cast<Buffer*> (ibh);
     }
 
     static void _load_program (evgHandle dh, evgHandle ph);
-
-    inline static void _load_shader (evgHandle dh, evgHandle sh)
-    {
-        // (static_cast<Device*> (dh))->load_shader (
-        //     static_cast<Shader*> (sh));
-    }
-
-    inline static void _load_swap (evgHandle dh, evgHandle sh)
-    {
-        (static_cast<Device*> (dh))->platform->load_swap (static_cast<const Swap*> (sh));
-    }
-
+    static void _load_swap (evgHandle dh, evgHandle sh);
     static void _load_texture (evgHandle dh, evgHandle th, int unit);
     static void _load_stencil (evgHandle dh, evgHandle sh);
     static void _load_target (evgHandle dh, evgHandle th);
-
-    inline static void _load_vertex_buffer (evgHandle dh, evgHandle vbh, int location)
-    {
-        (static_cast<Device*> (dh))->active_vertex_buffer[location] =
-            static_cast<Buffer*> (vbh);
-    }
+    static void _load_vertex_buffer (evgHandle dh, evgHandle vbh, int location);
 
     EL_DISABLE_COPY (Device);
 };
@@ -167,7 +228,7 @@ public:
     }
 
 private:
-    static evgHandle _create (evgHandle dh, const evgSwapSetup* setup)
+    static evgHandle _create (evgHandle dh, const evgSwapInfo* setup)
     {
         return (static_cast<Device*> (dh))->platform->create_swap (setup);
     }
@@ -195,17 +256,17 @@ public:
         return glGetError() == GL_NO_ERROR;
     }
 
-    inline evgTextureType type() const noexcept { return _setup.type; }
-    inline evgColorFormat format() const noexcept { return _setup.format; }
+    inline evgTextureType type() const noexcept { return m_setup.type; }
+    inline evgColorFormat format() const noexcept { return m_setup.format; }
 
     // inline uint32_t levels() const noexcept { return _setup.levels; }
-    inline uint32_t width() const noexcept { return _setup.width; }
-    inline uint32_t height() const noexcept { return _setup.height; }
-    inline uint32_t depth() const noexcept { return _setup.depth; }
-    inline uint32_t size() const noexcept { return _setup.size; }
+    inline uint32_t width() const noexcept { return m_setup.width; }
+    inline uint32_t height() const noexcept { return m_setup.height; }
+    inline uint32_t depth() const noexcept { return m_setup.depth; }
+    inline uint32_t size() const noexcept { return m_setup.size; }
 
     inline bool has_uploaded() const noexcept { return uploaded; }
-    inline bool is_a (TextureType type) const noexcept { return _setup.type == type; }
+    inline bool is_a (TextureType type) const noexcept { return m_setup.type == type; }
     inline bool is_dummy() const noexcept { return dummy; }
     inline bool is_dynamic() const noexcept { return dynamic; }
     inline bool is_render_target() const noexcept { return render_target; }
@@ -231,7 +292,7 @@ protected:
     virtual bool upload_data (const uint8_t** data) = 0;
 
     Device& device;
-    TextureSetup _setup;
+    TextureSetup m_setup;
 
     GLuint texture { 0 };
     GLenum gl_levels { 0 };
@@ -297,7 +358,7 @@ private:
     evgBufferInfo info;
     bool dynamic = false;
     GLuint buffer { 0 },
-           target { 0 };
+        target { 0 };
 
     inline static evgHandle _create (evgHandle device, evgBufferType type, uint32_t capacity, uint32_t flags)
     {

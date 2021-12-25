@@ -49,6 +49,36 @@ static int ctx_visual_attribs[] = { GLX_STENCIL_SIZE,
                                     GL_TRUE,
                                     None };
 
+//=============================================================================
+using XDeleter = int (*) (void*);
+template <typename T>
+class unique_xptr : public std::unique_ptr<T, XDeleter> {
+public:
+    using parent_type = std::unique_ptr<T, XDeleter>;
+    unique_xptr() : parent_type (nullptr, __delete) {}
+    unique_xptr (T* ptr) : parent_type (ptr, __delete) {}
+
+private:
+    static int __delete (void* data) {
+        return XFree (data);
+    }
+};
+
+//=============================================================================
+struct GLXSwap final : public gl::Swap {
+    xcb_window_t ID { 0 };
+    GLXFBConfig config { 0 };
+    int screen { -1 };
+
+    explicit GLXSwap (const evgSwapInfo* s)
+    {
+        memcpy (&this->setup, s, sizeof (evgSwapInfo));
+    }
+
+    inline constexpr bool valid() const noexcept { return config != 0 && ID != 0 && screen >= 0; }
+};
+
+//=============================================================================
 static Display* glx_display_open();
 static xcb_get_geometry_reply_t* get_window_geometry (xcb_connection_t* xcb_conn, xcb_drawable_t drawable);
 static inline int get_screen_number_from_root (xcb_connection_t* xcb_conn, xcb_window_t root);
@@ -63,18 +93,7 @@ static int log_x11_error (Display* display, XErrorEvent* error)
     return 0;
 }
 
-struct GLXSwap final : public gl::Swap {
-    xcb_window_t ID { 0 };
-    GLXFBConfig config { 0 };
-    int screen { -1 };
 
-    explicit GLXSwap (const evgSwapSetup* s)
-    {
-        memcpy (&this->setup, s, sizeof (evgSwapSetup));
-    }
-
-    inline constexpr bool valid() const noexcept { return config != 0 && ID != 0 && screen >= 0; }
-};
 
 class GLXPlatform final : public Platform {
 public:
@@ -93,7 +112,7 @@ public:
     }
 
     //========================================================================
-    Swap* create_swap (const evgSwapSetup* setup) override
+    Swap* create_swap (const evgSwapInfo* setup) override
     {
         auto swap = std::make_unique<GLXSwap> (setup);
         if (! attach_swap (swap.get()))
@@ -215,7 +234,7 @@ private:
     GLXSwapType swap_type = GLXSwapType::NORMAL;
     bool present_initialized = false;
 
-    friend void glx_platform_delete (Platform* p);
+    friend void destroy_platform (Platform* p);
 
     bool attach_swap (GLXSwap* swap)
     {
@@ -366,19 +385,18 @@ static Display* glx_display_open()
     screen_iterator = xcb_setup_roots_iterator (xcb_get_setup (xcb_conn));
     screen = screen_iterator.data;
     if (! screen) {
-        std::clog << "Unable to get screen root" << std::endl;
+        std::clog << "[opengl] unable to get screen root" << std::endl;
         goto error;
     }
 
     screen_num = get_screen_number_from_root (xcb_conn, screen->root);
     if (screen_num < 0) {
-        std::clog << "Unable to get screen number from root" << std::endl;
+        std::clog << "[opengl] unable to get screen number from root" << std::endl;
         goto error;
     }
 
-    std::clog << "loading glx: screen #" << screen_num << std::endl;
     if (! gladLoaderLoadGLX (display, screen_num)) {
-        std::clog << "Unable to load GLX entry functions" << std::endl;
+        std::clog << "[opengl] Unable to load GLX entry functions" << std::endl;
         goto error;
     }
 
@@ -390,54 +408,7 @@ error:
     return nullptr;
 }
 
-template <typename Dt>
-struct ScopedXData {
-    ScopedXData() : data (nullptr) {}
-    ScopedXData (Dt* d) : data (d) {}
-    ScopedXData (const ScopedXData& o)
-    {
-    }
-    ~ScopedXData()
-    {
-        if (data != nullptr)
-            XFree (data);
-    }
 
-    ScopedXData& operator= (Dt* d) = delete;
-
-    void reset (Dt* d)
-    {
-        if (data == d)
-            return;
-        if (data != nullptr) {
-            XFree (data);
-            data = nullptr;
-        }
-        data = d;
-    }
-
-    operator Dt*() const noexcept { return get(); }
-    Dt* get() const noexcept { return data; }
-
-private:
-    Dt* data = nullptr;
-};
-
-using XDeleter = int (*) (void*);
-template <typename T>
-class unique_xptr : public std::unique_ptr<T, XDeleter> {
-public:
-    using parent_type = std::unique_ptr<T, XDeleter>;
-    unique_xptr() : parent_type (nullptr, __delete) {}
-    unique_xptr (T* ptr) : parent_type (ptr, __delete) {}
-
-private:
-    static int __delete (void* data)
-    {
-        std::clog << __PRETTY_FUNCTION__ << std::endl;
-        return XFree (data);
-    }
-};
 
 static bool glx_create_new (Display* display, GLXContext& context, GLXPbuffer& pbuffer)
 {
@@ -476,7 +447,7 @@ static bool glx_context_free (Display* display, GLXContext context)
     return true;
 }
 
-Platform* glx_platform_new()
+Platform* create_platform()
 {
     auto display = glx_display_open();
     if (display == nullptr)
@@ -504,7 +475,7 @@ Platform* glx_platform_new()
     return new GLXPlatform (display, context, pbuffer);
 }
 
-void glx_platform_delete (Platform* p)
+void destroy_platform (Platform* p)
 {
     std::clog << "closing GLX" << std::endl;
     auto glx = dynamic_cast<GLXPlatform*> (p);

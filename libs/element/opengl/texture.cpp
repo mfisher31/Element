@@ -10,12 +10,6 @@ void Texture::enable_fbo() noexcept
         glGenFramebuffers (1, &fbo);
 }
 
-bool activate_stencil (GLuint buffer, GLuint attachment = GL_DEPTH_STENCIL_ATTACHMENT) {
-	glFramebufferRenderbuffer (GL_DRAW_FRAMEBUFFER, attachment,
-				               GL_RENDERBUFFER, buffer);
-	return check_ok ("glFramebufferRenderbuffer");
-}
-
 void Texture::prepare_render (int side /* Stensil* st */) noexcept
 {
     enable_fbo();
@@ -27,14 +21,14 @@ void Texture::prepare_render (int side /* Stensil* st */) noexcept
         return;
     }
 
-    if (_setup.type == EVG_TEXTURE_2D) {
+    if (m_setup.type == EVG_TEXTURE_2D) {
         glFramebufferTexture2D (GL_DRAW_FRAMEBUFFER,
                                 GL_COLOR_ATTACHMENT0,
                                 GL_TEXTURE_2D,
                                 texture,
                                 0);
 
-    } else if (_setup.type == EVG_TEXTURE_CUBE) {
+    } else if (m_setup.type == EVG_TEXTURE_CUBE) {
         glFramebufferTexture2D (GL_FRAMEBUFFER,
                                 GL_COLOR_ATTACHMENT0,
                                 GL_TEXTURE_CUBE_MAP_POSITIVE_X + side,
@@ -93,7 +87,7 @@ void Texture::_fill_info (evgHandle th, evgTextureInfo* setup)
 {
     auto tex = static_cast<Texture*> (th);
     if (setup != nullptr)
-        memcpy (setup, &tex->_setup, sizeof (evgTextureInfo));
+        memcpy (setup, &tex->m_setup, sizeof (evgTextureInfo));
 }
 
 void Texture::_update (evgHandle tex, const uint8_t* data)

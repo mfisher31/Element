@@ -4,13 +4,12 @@
 #include <iostream>
 #include <memory>
 
-#include <element/graphics.h>
+#include <element/graphics.hpp>
 #include <element/plugin.h>
 
 #include "helpers.hpp"
 #include "opengl.hpp"
 #include "program.hpp"
-#include "x11_glx.hpp"
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
@@ -18,15 +17,15 @@
 #define glog(msg) std::clog << msg << std::endl
 
 namespace gl {
-//=============================================================================
 
+extern Platform* create_platform();
+extern void destroy_platform (Platform* p);
+
+//=============================================================================
 Device::Device (PlatformPtr plat)
     : platform (std::move (plat))
 {
-    for (int i = 0; i < 8; ++i)
-        active_vertex_buffer[i] = nullptr;
-    for (int i = 0; i < 8; ++i)
-        active_texture[i] = nullptr;
+    state = state_stack.get();
 }
 
 Device::~Device()
@@ -38,7 +37,7 @@ evgHandle Device::_create()
 {
     std::unique_ptr<Device> device;
 
-    if (auto plat = PlatformPtr (gl::glx_platform_new(), gl::glx_platform_delete))
+    if (auto plat = PlatformPtr (gl::create_platform(), gl::destroy_platform))
         device.reset (new Device (std::move (plat)));
 
     if (device == nullptr || device->platform == nullptr)
@@ -131,9 +130,9 @@ void Device::ortho (float left, float right, float top, float bottom, float near
 void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
 {
     const auto mode = gl::topology (_mode);
-    auto vbuf = active_vertex_buffer[0];
-    auto ibuf = active_index_buffer;
-    auto program = active_program;
+    auto vbuf = state->vbo[0];
+    auto ibuf = state->ebo;
+    auto program = state->program;
 
     float width = 500.f;
     float height = 500.f;
@@ -144,23 +143,23 @@ void Device::draw (evgDrawMode _mode, uint32_t start, uint32_t nverts)
     if (program == nullptr)
         goto noprog;
 
-    if (active_target) {
-        active_target->prepare_render();
-        if (active_stencil)
-            active_stencil->prepare_render();
+    if (state->target) {
+        state->target->prepare_render();
+        if (state->stencil)
+            state->stencil->prepare_render();
     } else {
         glBindFramebuffer (GL_DRAW_FRAMEBUFFER, 0);
     }
 
     for (int i = 0; i < 8; ++i) {
         glActiveTexture (GL_TEXTURE0 + i);
-        if (auto t = active_texture[i])
+        if (auto t = state->texture[i])
             t->bind();
         else
             glBindTexture (GL_TEXTURE_2D, 0);
     }
 
-    program->load_buffers (active_vertex_buffer, ibuf);
+    program->load_buffers (state->vbo, ibuf);
     glUseProgram (program->object());
     program->process_uniforms();
 
@@ -179,6 +178,8 @@ done:
     return;
 }
 
+
+
 //=============================================================================
 void Device::_enter_context (evgHandle dh)
 {
@@ -193,6 +194,17 @@ void Device::_leave_context (evgHandle dh)
 void Device::_clear_context (evgHandle dh)
 {
     (static_cast<Device*> (dh))->platform->clear_context();
+}
+
+//=============================================================================
+void Device::_save_state (evgHandle dh) {
+    auto device = static_cast<Device*> (dh);
+    device->state = device->state_stack.push();
+}
+
+void Device::_restore_state (evgHandle dh) {
+    auto device = static_cast<Device*> (dh);
+    device->state = device->state_stack.pop();
 }
 
 //=============================================================================
@@ -273,28 +285,37 @@ void Device::_flush (evgHandle dh)
 
 void Device::_load_program (evgHandle dh, evgHandle ph)
 {
-    (static_cast<Device*> (dh))->active_program =
+    (static_cast<Device*> (dh))->state->program =
         static_cast<Program*> (ph);
 }
 
-void Device::_load_texture (evgHandle dh, evgHandle th, int unit)
+void Device::_load_swap (evgHandle dh, evgHandle sh)
 {
-    auto device = static_cast<Device*> (dh);
-    auto texture = static_cast<Texture*> (th);
-    auto current = device->active_texture[unit];
-    device->active_texture[unit] = texture;
+    (static_cast<Device*> (dh))->platform->load_swap (static_cast<const Swap*> (sh));
+}
+
+void Device::_load_texture (evgHandle dh, evgHandle th, int slot)
+{
+    (static_cast<Device*> (dh))->state->texture[slot] =
+        static_cast<Texture*> (th);
 }
 
 void Device::_load_stencil (evgHandle dh, evgHandle sh)
 {
-    (static_cast<Device*> (dh))->active_stencil =
+    (static_cast<Device*> (dh))->state->stencil =
         static_cast<Stencil*> (sh);
 }
 
 void Device::_load_target (evgHandle dh, evgHandle th)
 {
-    (static_cast<Device*> (dh))->active_target =
+    (static_cast<Device*> (dh))->state->target =
         static_cast<Texture*> (th);
+}
+
+void Device::_load_vertex_buffer (evgHandle dh, evgHandle vbh, int slot)
+{
+    (static_cast<Device*> (dh))->state->vbo[slot] =
+        static_cast<Buffer*> (vbh);
 }
 
 const evgDescriptor* Device::descriptor()
@@ -305,6 +326,8 @@ const evgDescriptor* Device::descriptor()
         .enter_context = _enter_context,
         .leave_context = _leave_context,
         .clear_context = _clear_context,
+        .save_state = _save_state,
+        .restore_state = _restore_state,
         .enable = _enable,
         .viewport = _viewport,
         .clear = _clear,

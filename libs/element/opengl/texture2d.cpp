@@ -6,45 +6,21 @@ namespace gl {
 Texture::Texture (Device& dev, const evgTextureInfo& s)
     : device (dev)
 {
-    memcpy (&_setup, &s, sizeof (evgTextureInfo));
-    gl_format = gl::color_format (_setup.format);
-    gl_format_internal = gl::color_format_internal (_setup.format);
-    gl_format_type = gl::color_format_type (_setup.format);
-    gl_target = gl::texture_target (_setup.type);
+    memcpy (&m_setup, &s, sizeof (evgTextureInfo));
+    gl_format = gl::color_format (m_setup.format);
+    gl_format_internal = gl::color_format_internal (m_setup.format);
+    gl_format_type = gl::color_format_type (m_setup.format);
+    gl_target = gl::texture_target (m_setup.type);
 
-    dynamic = (_setup.flags & EVG_OPT_DYNAMIC) != 0;
-    render_target = (_setup.flags & EVG_OPT_RENDER_TARGET) != 0;
-    dummy = (_setup.flags & EVG_OPT_DUMMY) != 0;
-    mipmaps = (_setup.flags & EVG_OPT_USE_MIPMAPS) != 0;
+    dynamic = (m_setup.flags & EVG_DYNAMIC) != 0;
+    render_target = (m_setup.flags & EVG_RENDER_TARGET) != 0;
+    dummy = (m_setup.flags & EVG_DUMMY) != 0;
+    mipmaps = (m_setup.flags & EVG_MIPMAPS) != 0;
 
     if (gl::gen_textures (1, &texture)) {
         gl::bind_texture (gl_target, texture);
         gl::bind_texture (gl_target, 0);
     }
-}
-
-static inline uint32_t evg_color_format_is_compressed (evgColorFormat format)
-{
-    switch (format) {
-        default:
-            break;
-    }
-    return false;
-}
-static inline uint32_t evg_color_format_bpp (evgColorFormat format)
-{
-    switch (format) {
-        case EVG_COLOR_FORMAT_UNKNOWN:
-            return 0;
-        case EVG_COLOR_FORMAT_RGBA:
-        case EVG_COLOR_FORMAT_BGRA:
-        case EVG_COLOR_FORMAT_BGRX:
-            return 32;
-        default:
-            break;
-    }
-
-    return 0;
 }
 
 static inline uint32_t evg_nlevels (uint32_t width, uint32_t height, uint32_t depth)
@@ -69,7 +45,7 @@ bool Texture2D::bind_data (const uint8_t** data)
 {
     uint32_t row_size = width() * evg_color_format_bpp (format());
     uint32_t tex_size = height() * row_size / 8;
-    uint32_t num_levels = _setup.levels;
+    uint32_t num_levels = m_setup.levels;
     bool compressed = evg_color_format_is_compressed (format());
     bool success;
 
@@ -88,10 +64,10 @@ bool Texture2D::bind_data (const uint8_t** data)
     if (! gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, num_levels - 1))
         success = false;
     
-    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    gl::tex_param_i(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl::tex_param_i (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     if (! gl::bind_texture (GL_TEXTURE_2D, 0))
         success = false;
