@@ -187,6 +187,7 @@ def element_sources (ctx):
     lib_sources = '''
         libs/element/src/bindings.cpp
         libs/element/src/context.cpp
+        libs/element/src/module.cpp
         libs/element/src/scripting.cpp
         libs/element/src/strings.cpp
         libs/element/src/video.cpp
