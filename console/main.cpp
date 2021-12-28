@@ -30,9 +30,9 @@ std::unique_ptr<MainBackend> backend;
 
 int run_ui (int ac, const char* av[])
 {
-    backend->test_open_module ("org.lvtk.JLV2");
-    backend->test_open_module ("el.UI");
-    backend->test_load_modules();
+    backend->open_module ("org.lvtk.JLV2");
+    backend->open_module ("el.UI");
+    backend->load_modules();
     return backend->test_main ("el.UI", ac, av);
 }
 
@@ -42,14 +42,14 @@ int run_console (int ac, const char* av[])
     sol::state_view view ((lua_State*) backend->test_lua_state());
     
     view["import"] = [](const char* name) -> bool {
-        backend->test_open_module (name);
+        backend->open_module (name);
         return true;
     };
 
     view["main"] = [](const char* name) -> int {
         std::vector<const char*> args;
         args.push_back ("element");
-        backend->test_load_modules();
+        backend->load_modules();
         return backend->test_main (name, 1, args.data());
     };
 
@@ -64,11 +64,11 @@ int main (int ac, char* av[])
     bool console = true;
     setup_dll_dirs();
     backend = std::make_unique<MainBackend>();
-    backend->test_add_module_search_path (fs::path (
+    backend->add_module_path (fs::path (
                                               fs::current_path() / "build/modules")
                                               .make_preferred()
                                               .string());
-    backend->test_discover_modules();
+    backend->discover_modules();
 
     std::vector<const char*> cli;
     for (int i = 0; i < ac; ++i)
