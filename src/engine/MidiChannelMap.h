@@ -87,9 +87,7 @@ public:
     const Array<int>& getMap() const { return channelMap; }
 
 private:
-    // TODO: optimize: use plain C array
     Array<int> channelMap;
-    int channels [17];
     MidiBuffer tempMidi;
 };
 
