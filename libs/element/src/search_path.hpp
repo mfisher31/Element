@@ -22,6 +22,7 @@ public:
         std::copy (o.paths.begin(), o.paths.end(), this->paths.begin());
         return *this;
     }
+    
     SearchPath& operator= (SearchPath&& o)
     {
         this->paths = std::move (o.paths);

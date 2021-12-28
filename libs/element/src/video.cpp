@@ -19,9 +19,9 @@ struct fps_to_nanoseconds {
 using FPS30 = fps_to_nanoseconds<30>;
 using FPS60 = fps_to_nanoseconds<60>;
 using FPS24 = fps_to_nanoseconds<24>;
-using FPS5 = fps_to_nanoseconds<5>;
+using FPS5  = fps_to_nanoseconds<5>;
 
-class TestDisplay : public VideoDisplay {
+class TestDisplay : public evg::Display {
 public:
     TestDisplay (evg::ImageSource& s, evg::SolidSource& sd, evg::Swap* sw)
         : source (s), solid (sd), swap (sw) {}
@@ -37,12 +37,12 @@ public:
         g.ortho (0.0f, 640.0, 0.0f, 360.0, -100.0, 100.0);
 
         g.save_state();
-        source.expose (g);
+        solid.expose (g);
         g.restore_state();
 
-        // g.save_state();
-        // solid.expose_frame (g);
-        // g.restore_state();
+        g.save_state();
+        source.expose (g);
+        g.restore_state();
 
         device.flush();
         device.present();
@@ -55,7 +55,6 @@ private:
     evg::Source& source;
     evg::Source& solid;
     std::unique_ptr<evg::Swap> swap;
-    evgMatrix4 projection;
 };
 
 static std::unique_ptr<evg::ImageSource> source;
@@ -128,7 +127,7 @@ Video::~Video()
     }
 }
 
-VideoDisplay* Video::create_display (const evgSwapInfo* setup)
+evg::Display* Video::create_display (const evgSwapInfo* setup)
 {
     if (source == nullptr || graphics == nullptr)
         return nullptr;
@@ -191,8 +190,9 @@ void Video::stop_thread()
 {
     if (is_running()) {
         stopflag.store (1);
-
-        while (is_running()) {
+        
+        int retries = 4;
+        while (is_running() && --retries >= 0) {
             std::this_thread::sleep_for (std::chrono::milliseconds (14));
         }
 

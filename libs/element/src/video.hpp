@@ -1,4 +1,4 @@
-/** 
+/**
     This file is part of Element.
     Copyright (C) 2016-2021  Kushview, LLC.  All rights reserved.
 
@@ -30,13 +30,9 @@
 struct elVideo{};
 
 namespace element {
-class Compositor final {
-public:
-    Compositor() = default;
-    ~Compositor()= default;
 
-private:
-    EL_DISABLE_COPY (Compositor);
+struct VideoSetup {
+    int width = 0, height = 0;
 };
 
 class Video final {
@@ -44,21 +40,23 @@ public:
     Video();
     ~Video();
     
-    VideoDisplay* create_display (const evgSwapInfo* setup);
+    evg::Display* create_display (const evgSwapInfo* setup);
     bool load_device_descriptor (const evgDescriptor* desc);
     evg::Device& graphics_device() { return *graphics; }
 
     bool is_running()   const noexcept { return running.load() == 1; }
     bool should_stop()  const noexcept { return stopflag.load() == 1; }
+    
     void start_thread();
     void stop_thread();
 
 private:
     std::unique_ptr<evg::Device> graphics;
     std::mutex compositor_lock;
-    std::vector<VideoDisplay*> displays;
+    std::vector<evg::Display*> displays;
     std::thread video_thread;
     std::atomic<int> stopflag { 0 }, running { 0 };
+
     static void thread_entry (Video& video);
 };
 

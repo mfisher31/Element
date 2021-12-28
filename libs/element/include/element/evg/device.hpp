@@ -337,4 +337,15 @@ private:
     void destroy();
 };
 
+class Display {
+public:
+    virtual ~Display() = default;
+
+protected:
+    Display () = default;
+
+private:
+    EL_DISABLE_COPY(Display);
+};
+
 } // namespace evg
