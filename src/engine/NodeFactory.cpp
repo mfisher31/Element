@@ -20,6 +20,7 @@
 #include "engine/nodes/BaseProcessor.h"
 #include "engine/nodes/AudioProcessorNode.h"
 #include "engine/nodes/AudioRouterNode.h"
+#include "engine/nodes/ImageNode.h"
 #include "engine/nodes/LuaNode.h"
 #include "engine/nodes/MidiChannelSplitterNode.h"
 #include "engine/nodes/MidiMonitorNode.h"
@@ -47,6 +48,9 @@ NodeFactory::NodeFactory()
     add<OSCReceiverNode> (EL_INTERNAL_ID_OSC_RECEIVER);
     add<ScriptNode> (EL_INTERNAL_ID_SCRIPT);
     add<GraphNode> (EL_INTERNAL_ID_GRAPH);
+
+    add<ImageNode> (EL_INTERNAL_ID_IMAGE);
+    add<VideoOutputNode> (EL_INTERNAL_ID_VIDEO_OUTPUT);
 }
 
 NodeFactory::~NodeFactory() 

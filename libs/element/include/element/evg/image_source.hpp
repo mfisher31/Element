@@ -9,7 +9,7 @@ namespace evg {
 
 class Context;
 
-class ImageSource : public Source {
+class EL_API ImageSource : public Source {
 public:
     ImageSource();
     ~ImageSource();

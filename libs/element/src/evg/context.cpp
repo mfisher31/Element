@@ -1,7 +1,9 @@
 
+#include <cassert>
+#include <iostream>
+
 #include "element/evg/context.hpp"
 #include "element/evg/device.hpp"
-#include <cassert>
 
 namespace evg {
 
@@ -173,7 +175,7 @@ Context::Context (Device& dev)
 
     program.reset (new DefaultProgram());
     if (! program->compile (dev))
-        throw "compile error";
+        std::clog << "[evg] context default program failed to compile" << std::endl;
 
     dev.leave_context();
 }

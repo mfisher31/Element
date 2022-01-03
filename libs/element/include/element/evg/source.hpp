@@ -4,7 +4,7 @@
 
 namespace evg {
 
-class Source {
+class EL_API Source {
 public:
     Source();
     virtual ~Source();

@@ -3,12 +3,13 @@
 #include <cstdlib>
 #include <functional>
 
-#include "helpers.hpp"
-#include "opengl.hpp"
 #define GLAD_GLX_IMPLEMENTATION 1
 #include <glad/glx.h>
 
 #include <X11/Xlib-xcb.h>
+
+#include "opengl.hpp"
+#include "helpers.hpp"
 
 namespace gl {
 
@@ -150,8 +151,9 @@ public:
             if (! glXMakeContextCurrent (display, active_swap->ID, active_swap->ID, context))
                 std::clog << "Failed to make swap current (swap)" << std::endl;
         } else {
-            if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context))
+            if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context)) {
                 std::clog << "Failed to make context current (internal)" << std::endl;
+            }
         }
     }
 
@@ -227,7 +229,7 @@ public:
 
 private:
     Display* display { nullptr };
-    GLXContext context { 0 };
+    GLXContext context { nullptr };
     GLXPbuffer pbuffer { 0 };
 
     const GLXSwap* active_swap { nullptr };
@@ -460,12 +462,17 @@ Platform* create_platform()
     }
 
     if (! glXMakeContextCurrent (display, pbuffer, pbuffer, context)) {
-        std::clog << "can't activate context.\n";
+        std::clog << "[opengl] glx: could not activate context.\n";
         return nullptr;
     }
 
-    if (! gladLoaderLoadGL()) {
-        std::clog << "could not load GL\n";
+    if (gladLoaderLoadGL() == 0) {
+        std::clog << "[opengl] glx: could not load GL\n";
+        return nullptr;
+    }
+
+    if (! glXMakeContextCurrent (display, None, None, nullptr)) {
+        std::clog << "[opengl] glx: could not clear context.\n";
         return nullptr;
     }
 
@@ -477,7 +484,7 @@ Platform* create_platform()
 
 void destroy_platform (Platform* p)
 {
-    std::clog << "closing GLX" << std::endl;
+    std::clog << "[opengl] glx closing" << std::endl;
     auto glx = dynamic_cast<GLXPlatform*> (p);
     auto display = glx->display;
     auto pbuffer = glx->pbuffer;

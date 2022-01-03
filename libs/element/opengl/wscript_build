@@ -26,9 +26,9 @@ opengl.env.append_unique ('LINKFLAGS', ['-fvisibility=hidden'])
 
 if bld.host_is_linux():
     opengl.source.append ('x11_glx.cpp')
-    # opengl.source.append ('glad/src/glad_glx.c')
     opengl.use.append ('X11')
-    opengl.linkflags.append ('-lX11-xcb')
+    opengl.env.append_unique ('LIB_XCB', ['X11-xcb'])
+    opengl.use.append ('XCB')
 elif bld.host_is_windows():
     opengl.source.append ('windows.c')
 elif bld.host_is_mac():

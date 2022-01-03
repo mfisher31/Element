@@ -98,7 +98,8 @@ extern void initializeWorld (Globals&);
 extern void shutdownWorld (Globals&, AppController&);
 } // namespace Element
 
-#define TEST_WINDOW 1
+#define TEST_WINDOW 0
+
 struct UI final {
     UI()
     {
@@ -136,7 +137,7 @@ struct UI final {
     std::unique_ptr<Element::Globals> world;
     std::unique_ptr<Element::AppController> controller;
     std::unique_ptr<TestWindow> window;
-    element::Context* context;
+    element::Context* context = nullptr;
 };
 
 static elHandle ui_create()
@@ -149,9 +150,7 @@ static void ui_load (elHandle handle, elFeatures features)
 {
     auto ui = (UI*) handle;
 
-    std::clog << "ui_load\n";
     EL_FEATURES_FOREACH (features, f) {
-        std::clog << "check: " << f->ID << std::endl;
         if (strcmp (f->ID, EL_JUCE__AudioPluginFormat) == 0) {
             auto ext = (const elJuceAudioPluginFormat*) f->data;
             if (auto fmt = std::unique_ptr<juce::AudioPluginFormat> (ext->create (ext->handle))) {
@@ -159,7 +158,6 @@ static void ui_load (elHandle handle, elFeatures features)
                 plugins.addFormat (fmt.release());
             }
         } else if (strcmp (f->ID, "el.Context") == 0) {
-            std::clog << "[ui] got a element::Context\n";
             ui->context = (element::Context*) f->data;
         }
     }
@@ -168,7 +166,6 @@ static void ui_load (elHandle handle, elFeatures features)
 static void ui_unload (elHandle handle)
 {
 #if ! TEST_WINDOW
-    std::clog << __PRETTY_FUNCTION__ << std::endl;
     auto ui = (UI*) handle;
     ui->controller.reset();
     ui->world.reset();
@@ -178,7 +175,6 @@ static void ui_unload (elHandle handle)
 static void ui_destroy (elHandle handle)
 {
 #if ! TEST_WINDOW
-    std::clog << __PRETTY_FUNCTION__ << std::endl;
     delete (UI*) handle;
 #endif
     juce::shutdownJuce_GUI();
@@ -208,8 +204,14 @@ static int ui_main (elHandle handle, int argc, const char* argv[])
 #endif
         JUCE_TRY
         {
-            while (MessageManager::getInstance()->runDispatchLoopUntil (14) && ! ui->window->shouldQuit())
+
+        #if ! TEST_WINDOW
+            while (MessageManager::getInstance()->runDispatchLoopUntil (14) && !ui->controller->shouldQuit())
                 ;
+        #else
+            while (MessageManager::getInstance()->runDispatchLoopUntil (14) && !ui->window->shouldQuit())
+                ;
+        #endif
         }
         JUCE_CATCH_EXCEPTION
 

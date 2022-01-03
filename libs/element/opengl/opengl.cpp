@@ -14,7 +14,7 @@
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
 
-#define glog(msg) std::clog << msg << std::endl
+#define glog(msg) std::cout << msg << std::endl
 
 namespace gl {
 
@@ -64,6 +64,7 @@ bool Device::setup_extensions()
 {
     if (! GLAD_GL_VERSION_3_3) {
         glog ("[opengl] error: requires GL version >= 3.3");
+        glog ("[opengl] version: v" << (const char*) glGetString (GL_VERSION));
         return false;
     }
 
