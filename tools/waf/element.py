@@ -35,8 +35,8 @@ def check_liblua (self):
         self.env.LUAJIT = bool (self.env.HAVE_LUA)
         self.define ('HAVE_LUAJIT', True)
     
+
     if not bool(self.env.LUAJIT):
-        self.env.LUAJIT = False
         self.check_cfg (package='lua5.4', uselib_store="LUA", 
                         args='--cflags --libs', mandatory=False)
         if not bool(self.env.HAVE_LUA):
@@ -44,6 +44,9 @@ def check_liblua (self):
                             args='--cflags --libs', mandatory=False)
         if not bool(self.env.HAVE_LUA):
             self.check_cfg (package='lua5.2', uselib_store="LUA", 
+                            args='--cflags --libs', mandatory=False)
+        if not bool(self.env.HAVE_LUA):
+            self.check_cfg (package='lua >= 5.2', uselib_store="LUA", 
                             args='--cflags --libs', mandatory=True)
 
     self.env.LUA = bool (self.env.HAVE_LUA)
