@@ -276,7 +276,7 @@ void Device::_present (evgHandle dh)
 void Device::_flush (evgHandle dh)
 {
 #ifdef __APPLE__
-    if ((static_cast<Device*> (dh))->active_swap == nullptr)
+    if ((static_cast<Device*> (dh))->state->active_swap == nullptr)
         glFlush();
 #else
     gl::unused (dh);

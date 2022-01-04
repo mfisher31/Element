@@ -69,6 +69,7 @@ typedef struct {
 #if defined(__linux__)
     uint32_t xwindow;
 #elif defined(__APPLE__)
+    void* view;
 #elif defined(_WIN32)
 #endif
 } evgWindow;

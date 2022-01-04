@@ -216,7 +216,7 @@ class Swap {
 public:
     virtual ~Swap() {}
 
-    SwapSetup setup { 0 };
+    SwapSetup setup;
 
     static const evgSwapInterface* interface()
     {

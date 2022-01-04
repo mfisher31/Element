@@ -32,7 +32,7 @@ if bld.host_is_linux():
 elif bld.host_is_windows():
     opengl.source.append ('windows.c')
 elif bld.host_is_mac():
-    opengl.source.append ('mac.m')
+    opengl.source.append ('mac.mm')
 
 bld (
     features='subst',
