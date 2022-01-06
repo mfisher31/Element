@@ -2,7 +2,7 @@
 #include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION 1
-#include <stb/stb_image.h>
+#include "stb/stb_image.h"
 
 #include "element/evg/context.hpp"
 #include "element/evg/image_source.hpp"

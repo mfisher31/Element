@@ -84,16 +84,15 @@
                 "${workspaceRoot}/.vscode/vscode.h"
             ],
             "includePath": [
+                "${workspaceRoot}/build/include",
                 "${workspaceRoot}/libs/JUCE/modules/*",
                 "${workspaceRoot}/libs/kv/modules/*",
                 "${workspaceRoot}/libs/jlv2/modules/*",
                 "${workspaceRoot}/libs/compat/*",
-                "${workspaceRoot}/libs/lua/*",
-                "${workspaceRoot}/libs/lua/src/*",
-                "${workspaceRoot}/libs/lua-kv/*",
-                "${workspaceRoot}/libs/lua-kv/src/*",
+                "${workspaceRoot}/libs/element/include/*",
                 "${workspaceRoot}/src/*",
                 "${workspaceRoot}/test/*",
+                "${workspaceRoot}/libs/element/opengl/glad/include/*",
                 "/opt/kushview/include/*",
                 "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include"
             ]
