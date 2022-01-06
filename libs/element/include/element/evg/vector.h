@@ -4,7 +4,12 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <xmmintrin.h>
+
+#if defined(__arm__) || defined(__aarch64__)
+    #include "element/evg/sse2neon.h"
+#else
+    #include <xmmintrin.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +61,8 @@ static inline void evg_vec3_copy (evgVec3* dst, evgVec3* src)
     dst->m = src->m;
 }
 
-static inline void evg_vec3_add (evgVec3* dst, const evgVec3* a, const evgVec3* b) {
+static inline void evg_vec3_add (evgVec3* dst, const evgVec3* a, const evgVec3* b)
+{
     dst->m = _mm_add_ps (a->m, b->m);
 }
 
@@ -81,11 +87,12 @@ static inline void evg_vec4_set (evgVec4* vec, float x, float y, float z, float 
     vec->m = _mm_set_ps (z, y, x, w);
 }
 
-static inline float evg_vec4_dot (const evgVec4* v1, const evgVec4* v2) {
+static inline float evg_vec4_dot (const evgVec4* v1, const evgVec4* v2)
+{
     evgVec4 add;
-	__m128 mul = _mm_mul_ps (v1->m, v2->m);
-	add.m = _mm_add_ps (_mm_movehl_ps(mul, mul), mul);
-	add.m = _mm_add_ps (_mm_shuffle_ps(add.m, add.m, 0x55), add.m);
+    __m128 mul = _mm_mul_ps (v1->m, v2->m);
+    add.m = _mm_add_ps (_mm_movehl_ps (mul, mul), mul);
+    add.m = _mm_add_ps (_mm_shuffle_ps (add.m, add.m, 0x55), add.m);
     return add.x;
 }
 
