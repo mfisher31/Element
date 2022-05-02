@@ -551,7 +551,7 @@ def build_app_objects (bld):
     library = bld.objects (
         features    = 'cxx',
         source      = element_sources (bld) + juce_extra_sources (bld),
-        includes    = common_includes() + [ 'libs/element/lua/el' ],
+        includes    = common_includes() + [ 'libs/element/lua/el', 'libs/clap/include' ],
         target      = 'lib/app-objects',
         name        = 'APP_objects',
         env         = env,

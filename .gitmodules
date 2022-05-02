@@ -10,3 +10,6 @@
 [submodule "libs/waf"]
 	path = libs/waf
 	url = https://gitlab.com/kushview/waf.git
+[submodule "libs/clap"]
+	path = libs/clap
+	url = https://github.com/free-audio/clap

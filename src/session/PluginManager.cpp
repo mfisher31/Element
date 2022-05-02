@@ -20,8 +20,9 @@
 #include "session/PluginManager.h"
 #include "session/Node.h"
 #include "engine/nodes/NodeTypes.h"
+#include "engine/CLAPPluginFormat.h"
 #include "engine/NodeFactory.h"
-#include "engine//IONode.h"
+#include "engine/IONode.h"
 #include "DataPath.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -690,6 +691,8 @@ void PluginManager::addDefaultFormats()
         else if (fmt == "LV2")
             audioPlugs.addFormat (new jlv2::LV2PluginFormat());
 #endif
+        else if (fmt == "CLAP")
+            audioPlugs.addFormat (new CLAPPluginFormat());
     }
 }
 

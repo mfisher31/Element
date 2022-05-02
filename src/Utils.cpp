@@ -45,7 +45,7 @@ namespace Util {
 #if JLV2_PLUGINHOST_LV2
         fmts.add ("LV2");
 #endif
-
+        fmts.add ("CLAP");
         return fmts;
     }
 
