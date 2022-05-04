@@ -26,8 +26,8 @@ namespace Element {
 class CLAPPluginFormat : public AudioPluginFormat
 {
 public:
-    CLAPPluginFormat() = default;
-    ~CLAPPluginFormat() = default;
+    CLAPPluginFormat();
+    ~CLAPPluginFormat();
 
     String getName() const override { return "CLAP"; }
     void findAllTypesForFile (OwnedArray<PluginDescription>& results, const String& fileOrIdentifier) override;
@@ -49,6 +49,8 @@ protected:
     bool requiresUnblockedMessageThreadDuringCreation (const PluginDescription&) const override { return false; }
 
 private:
+    class Modules;
+    std::unique_ptr<Modules> modules;
     void recursiveFileSearch (StringArray& results, const File& dir, const bool recursive);
 };
 
